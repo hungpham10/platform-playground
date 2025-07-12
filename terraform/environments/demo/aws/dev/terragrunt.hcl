@@ -1,7 +1,4 @@
 locals {
-  platform        = read_terragrunt_config(
-    "${get_terragrunt_dir()}/../terragrunt.hcl"
-  )
   private_subnets = [
     {
       cidr = "10.0.1.0/24"
@@ -16,6 +13,9 @@ locals {
       zone = "us-west-2c"
     }
   ]
+  platform        = read_terragrunt_config(
+    "${get_terragrunt_dir()}/../terragrunt.hcl"
+  )
 }
 
 include "root" {
@@ -41,7 +41,7 @@ module "dev" {
   source      = "./specify"
   vpc         = module.common.vpc
   aws         = var.aws
-  name        = var.name
+  name        = "${local.platform.locals.workspace}"
   environment = "dev"
   subnets     = ${jsonencode(local.private_subnets)}
 }
