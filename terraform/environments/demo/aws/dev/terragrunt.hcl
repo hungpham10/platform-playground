@@ -42,6 +42,7 @@ module "dev" {
   vpc         = module.common.vpc
   aws         = var.aws
   name        = var.name
+  environment = "dev"
   subnets     = ${jsonencode(local.private_subnets)}
 }
 EOF

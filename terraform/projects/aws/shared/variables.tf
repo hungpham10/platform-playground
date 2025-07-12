@@ -6,3 +6,10 @@ variable "aws" {
     secret_key: string
   })
 }
+
+variable "subnets" {
+  type = list(object({
+    cidr = string
+    zone = string
+  }))
+}

@@ -6,21 +6,21 @@ locals {
   workspace    = local.workspace_vars.locals.workspace
 }
 
-generate "remote_state" {
-  path      = "backend.tf"
-  if_exists = "overwrite_terragrunt"
-  contents  = <<EOF
-terraform {
-  backend "remote" {
-    organization = "${local.organization}"
-
-    workspaces {
-      name = "${local.workspace}"
-    }
-  }
-}
-EOF
-}
+//generate "remote_state" {
+//  path      = "backend.tf"
+//  if_exists = "overwrite_terragrunt"
+//  contents  = <<EOF
+//terraform {
+//  backend "remote" {
+//    organization = "${local.organization}"
+//
+//    workspaces {
+//      name = "${local.workspace}"
+//    }
+//  }
+//}
+//EOF
+//}
 
 terraform {
   before_hook "clean" {

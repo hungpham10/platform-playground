@@ -1,5 +1,5 @@
 module "vpc" {
-  source = "../../../modules/aws/vpc"
+  source = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/aws/vpc?ref=main"
   aws    = var.aws
   name   = "vpc"
   flags  = {
@@ -9,8 +9,9 @@ module "vpc" {
 }
 
 module "public-subnet" {
-  source  = "../../../modules/aws/subnet"
+  source  = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/aws/subnet?ref=main"
+  name    = "public-subnet"
   aws     = var.aws
-  name    = "public"
   subnets = var.subnets
+  vpc     = module.vpc.id
 }
