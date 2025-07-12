@@ -1,0 +1,28 @@
+---
+- name: Create BTRFS filesystem
+  filesystem:
+    fstype: btrfs
+    dev: "{{ item.device if 'device' in item else '/dev/' + item.vg + '/' + item.name }}"
+    force: "{{ item.force_format | default(storage_force_format) | default(false) }}"
+  loop: "{{ storage_devices + storage_lvs }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.fstype | default('ext4') == 'btrfs'
+
+- name: Create BTRFS subvolumes
+  command: "btrfs subvolume create {{ item.mount_point }}/{{ item.subvolume }}"
+  args:
+    creates: "{{ item.mount_point }}/{{ item.subvolume }}"
+  loop: "{{ storage_devices + storage_lvs }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.fstype | default('ext4') == 'btrfs'
+    - item.subvolume is defined
+
+- name: Set BTRFS subvolume defaults
+  command: "btrfs subvolume set-default {{ item.subvolume_id }} {{ item.mount_point }}"
+  loop: "{{ storage_devices + storage_lvs }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.fstype | default('ext4') == 'btrfs'
+    - item.subvolume_id is defined

@@ -1,0 +1,49 @@
+#!/bin/bash
+set -euo pipefail
+
+REPORT_TYPE="$1"
+LOG_DIR="{{ pg_log_dir }}"
+REPORT_DIR="{{ pg_analysis_report_dir }}/${REPORT_TYPE}"
+DATE=$(date +%Y-%m-%d)
+
+case "$REPORT_TYPE" in
+  daily)
+    LOG_PATTERN="postgresql-$(date +%Y-%m-%d)*.log"
+    RETENTION_DAYS=7
+    ;;
+  weekly)
+    LOG_PATTERN="postgresql-$(date -d 'last week' +%Y-%m-%d)*.log"
+    RETENTION_DAYS=30
+    ;;
+  monthly)
+    LOG_PATTERN="postgresql-$(date -d 'last month' +%Y-%m)*.log"
+    RETENTION_DAYS=90
+    ;;
+  *)
+    echo "Invalid report type: $REPORT_TYPE"
+    exit 1
+    ;;
+esac
+
+# Generate HTML report
+pgbadger \
+  --prefix '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h ' \
+  --outfile "${REPORT_DIR}/report-${DATE}.html" \
+  --design synthesis \
+  --incremental \
+  --jobs 2 \
+  --slowquery {{ pg_slow_query_threshold }} \
+  --tempfile-size {{ pg_temp_file_threshold }} \
+  --deadlock-timeout {{ pg_deadlock_timeout }} \
+  "${LOG_DIR}/${LOG_PATTERN}"
+
+# Generate text summary
+pgbadger \
+  --prefix '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h ' \
+  --outfile "${REPORT_DIR}/summary-${DATE}.txt" \
+  --format stderr \
+  "${LOG_DIR}/${LOG_PATTERN}"
+
+# Cleanup old reports
+find "${REPORT_DIR}" -name "report-*.html" -mtime +${RETENTION_DAYS} -delete
+find "${REPORT_DIR}" -name "summary-*.txt" -mtime +${RETENTION_DAYS} -delete

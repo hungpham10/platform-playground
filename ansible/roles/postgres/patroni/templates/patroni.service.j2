@@ -1,0 +1,17 @@
+[Unit]
+Description=Patroni Distributed PostgreSQL
+After=syslog.target network.target etcd.service
+
+[Service]
+Type=simple
+User=postgres
+Group=postgres
+Environment=PATH=/usr/lib/postgresql/15/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStart=/usr/bin/patroni {{ patroni_config_dir }}/patroni.yml
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+TimeoutSec=30
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,84 @@
+---
+proxysql_required_packages:
+  - proxysql
+  - mysql-client
+
+proxysql_config_dir: /etc/proxysql
+proxysql_data_dir: /var/lib/proxysql
+proxysql_log_dir: /var/log/proxysql
+
+# ProxySQL admin interface
+proxysql_admin_port: 6032
+proxysql_admin_interface: "127.0.0.1"
+proxysql_admin_credentials:
+  username: admin
+  password: admin
+
+# PostgreSQL connection settings
+proxysql_postgres_interface: "0.0.0.0"
+proxysql_postgres_port: 6033
+proxysql_postgres_user: proxysql
+proxysql_postgres_password: "{{ vault_proxysql_postgres_password }}"
+
+# Connection pool settings
+proxysql_max_connections: 2048
+proxysql_max_pool_size: 100
+proxysql_connection_max_age: 3600
+
+# Server groups
+proxysql_hostgroups:
+  - id: 1
+    name: "writer"
+  - id: 2
+    name: "reader"
+
+# PostgreSQL servers
+proxysql_postgres_servers:
+  - host: "{{ groups['postgres_master'][0] }}"
+    port: 5432
+    hostgroup: 1
+    weight: 100
+  - host: "{{ groups['postgres_standby'][0] }}"
+    port: 5432
+    hostgroup: 2
+    weight: 100
+
+pgpool_required_packages:
+  - pgpool2
+  - postgresql-client
+
+pgpool_config_dir: /etc/pgpool2
+pgpool_run_dir: /var/run/pgpool
+pgpool_log_dir: /var/log/pgpool
+
+# Connection settings
+pgpool_listen_address: '*'
+pgpool_port: 5432
+pgpool_socket_dir: /var/run/postgresql
+
+# Backend nodes configuration
+pgpool_backends:
+  - host: "{{ groups['postgres_master'][0] }}"
+    port: 5432
+    weight: 1
+    data_directory: "/var/lib/postgresql/data"
+  - host: "{{ groups['postgres_standby'][0] }}"
+    port: 5432
+    weight: 1
+    data_directory: "/var/lib/postgresql/data"
+
+# Pool settings
+pgpool_num_init_children: 32
+pgpool_max_pool: 4
+pgpool_child_life_time: 300
+pgpool_connection_life_time: 0
+pgpool_client_idle_limit: 0
+
+# Load balancing settings
+pgpool_load_balance_mode: on
+pgpool_master_slave_mode: on
+pgpool_master_slave_sub_mode: 'stream'
+
+# Authentication
+pgpool_enable_pool_hba: on
+pgpool_pool_passwd: "{{ vault_pgpool_pool_passwd }}"

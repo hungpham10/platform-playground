@@ -1,0 +1,40 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Get hostname from /etc/hostname
+      command: cat /etc/hostname
+      register: hostname_file
+      changed_when: false
+
+    - name: Get hosts file content
+      command: cat /etc/hosts
+      register: hosts_file
+      changed_when: false
+
+    - name: Verify hostname is set correctly
+      assert:
+        that:
+          - "inventory_hostname in hostname_file.stdout"
+        fail_msg: "Hostname not set correctly in /etc/hostname"
+        success_msg: "Hostname is set correctly"
+
+    - name: Verify hosts entries
+      assert:
+        that:
+          - "'192.168.1.10 master01.example.com master01.local.example.com master01' in hosts_file.stdout"
+          - "'192.168.1.11 worker01.example.com worker01.local.example.com worker01' in hosts_file.stdout"
+        fail_msg: "Hosts entries not found or incorrect"
+        success_msg: "Hosts entries are correct"
+
+    - name: Check if rsyslog service is running
+      service_facts:
+      register: service_state
+
+    - name: Verify rsyslog service
+      assert:
+        that:
+          - "'rsyslog.service' in ansible_facts.services"
+        fail_msg: "rsyslog service not found"
+        success_msg: "rsyslog service is present"

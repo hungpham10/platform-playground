@@ -1,0 +1,17 @@
+---
+pg_analysis_report_dir: /var/lib/pgsql/reports
+pg_log_dir: /var/log/postgresql
+
+pg_required_packages:
+  - pgbadger
+  - mailx
+
+# Email configuration
+pg_report_email_to: "dba@example.com"
+pg_report_email_from: "postgres@{{ ansible_fqdn }}"
+pg_report_smtp_server: localhost
+
+# Analysis thresholds
+pg_slow_query_threshold: 1000  # ms
+pg_temp_file_threshold: 1024   # KB
+pg_deadlock_timeout: 1000      # ms

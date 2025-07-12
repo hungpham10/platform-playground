@@ -1,0 +1,8 @@
+#!/bin/bash
+
+echo "Checking replication status..."
+psql -t -A -c "SELECT client_addr, state, sent_lsn, write_lsn, flush_lsn, replay_lsn, \
+  write_lag, flush_lag, replay_lag FROM pg_stat_replication;"
+
+echo -e "\nReplication slot status:"
+psql -t -A -c "SELECT slot_name, active, restart_lsn FROM pg_replication_slots;"

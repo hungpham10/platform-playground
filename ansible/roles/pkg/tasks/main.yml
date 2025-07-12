@@ -1,0 +1,123 @@
+---
+- name: Set OS family facts
+  set_fact:
+    is_debian_based: "{{ ansible_os_family == 'Debian' }}"
+    is_redhat_based: "{{ ansible_os_family == 'RedHat' }}"
+
+- name: Replace apt mirror on ubuntu
+  become: true
+  template:
+    src: sources.list.j2
+    dest: /etc/apt/sources.list
+    backup: yes
+  run_once: true
+  register: replace_ubuntu_apt_config
+  when:
+    - ubuntu_apt_mirror is defined
+    - is_debian_based
+
+- name: APT | Update apt cache on ubuntu
+  become: true
+  apt:
+    update_cache: yes
+  run_once: true
+  when:
+    - replace_ubuntu_apt_config.changed
+    - is_debian_based
+
+- name: APT | Add new repositories keys
+  apt_key:
+    url: "{{ item }}"
+    state: present
+  with_items: "{{ linux_add_packages_keys | default([])}}"
+  when:
+    - is_debian_based
+    - linux_add_packages_keys | default([]) | length > 0
+  register: aptnewkeys
+  retries: 3
+  delay: 10
+  until: aptnewkeys is success
+
+- name: APT | Add new repository keys using key id only
+  apt_key:
+    keyserver: "{{ item.keyserver }}"
+    id: "{{ item.id }}"
+    state: "{{ item.state | default('present') }}"
+  with_items: "{{ linux_add_packages_key_ids | default([])}}"
+  when:
+    - linux_add_packages_key_ids is defined
+    - is_debian_based
+  register: aptnewkeys
+  retries: 3
+  delay: 10
+  until: aptnewkeys is success
+
+- name: APT | Add public signing keys
+  get_url:
+    url: "{{ item.key }}"
+    dest: "/usr/share/keyrings/{{ item.repository }}.gpg"
+  with_items: "{{ linux_add_public_signing_keys }}"
+  when:
+    - linux_add_public_signing_keys | default([]) | length > 0
+    - is_debian_based
+  register: aptnewkeys
+  retries: 3
+  delay: 10
+  until: aptnewkeys is success
+
+- name: APT | Add new repositories to sources
+  apt_repository:
+    repo: '{{item}}'
+    state: present
+  when:
+    - is_debian_based
+  with_items: "{{ linux_add_packages_repositories | default([])}}"
+  register: result
+  retries: 3
+  delay: 10
+  until: result is success
+
+- name: APT | Update apt cache on ubuntu after insert repositories
+  apt:
+    update_cache: yes
+    cache_valid_time: 86400 #One day
+  when:
+    - is_debian_based
+
+- name: Set default value for valid cache time
+  set_fact:
+    linux_add_packages_cache_valid_time: 86400
+
+- name: APT | Force update cache if new keys added
+  set_fact:
+    linux_add_packages_cache_valid_time: 0
+  register: result
+  retries: 3
+  delay: 10
+  until: result is success
+  when: aptnewkeys.changed
+
+- name: APT | Remove packages
+  apt:
+    name: "{{ item }}"
+    state: absent
+  ignore_errors: true
+  with_items: "{{ linux_remove_packages_names }}"
+  when:
+    - is_debian_based
+    - linux_remove_packages_names | default([]) | length > 0
+
+- name: APT | Install packages
+  apt:
+    name: "{{ item }}"
+    state: present
+    update_cache: yes
+    cache_valid_time: "{{linux_add_packages_cache_valid_time}}"
+  register: result
+  retries: 3
+  delay: 10
+  until: result is success
+  with_items: "{{ linux_add_packages_names }}"
+  when:
+    - is_debian_based
+    - linux_add_packages_names | default([]) | length > 0

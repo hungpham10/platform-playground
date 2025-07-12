@@ -1,0 +1,12 @@
+# Delete all existing rules
+-D
+
+# Set buffer size
+-b 8192
+
+# Failure mode
+-f 1
+
+{% for rule in audit_rules %}
+{{ rule }}
+{% endfor %}

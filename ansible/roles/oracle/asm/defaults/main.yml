@@ -1,0 +1,23 @@
+---
+asm_required_packages:
+  - oracleasm-support
+  - kmod-oracleasm
+  - sg3_utils
+  - device-mapper-multipath
+
+# ASM disk configuration
+asm_disks:
+  - name: DATA1
+    device: /dev/mapper/mpatha
+    diskgroup: DATA
+
+asm_diskgroups:
+  - name: DATA
+    redundancy: EXTERNAL
+    disks: 
+      - DATA1
+
+asm_scan_exclude_dirs:
+  - /dev/cdrom
+  - /dev/fd
+  - /dev/sr

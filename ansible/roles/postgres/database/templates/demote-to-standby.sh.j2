@@ -1,0 +1,23 @@
+#!/bin/bash
+set -e
+
+NEW_MASTER="$1"
+if [ -z "$NEW_MASTER" ]; then
+  echo "Usage: $0 <new_master_host>"
+  exit 1
+fi
+
+echo "Stopping PostgreSQL..."
+systemctl stop postgresql
+
+echo "Creating recovery.conf..."
+cat > {{ postgres_data_dir }}/recovery.conf <<EOF
+standby_mode = 'on'
+primary_conninfo = 'host=${NEW_MASTER} port=5432 user={{ postgres_replication_user }} password={{ postgres_replication_password }} application_name={{ inventory_hostname }}'
+restore_command = 'cp {{ postgres_archive_dir }}/%f %p'
+recovery_target_timeline = 'latest'
+primary_slot_name = '{{ inventory_hostname }}_slot'
+EOF
+
+echo "Starting PostgreSQL in standby mode..."
+systemctl start postgresql

@@ -1,0 +1,22 @@
+---
+pmm_required_packages:
+  - pmm2-client
+  - percona-toolkit
+
+pmm_config_dir: /etc/pmm-agent
+pmm_log_dir: /var/log/pmm-agent
+
+pmm_server_address: pmm.example.com:443
+pmm_server_username: admin
+pmm_server_password: "{{ vault_pmm_server_password }}"
+
+pmm_node_name: "{{ ansible_hostname }}"
+pmm_node_type: postgresql  # Options: postgresql, mysql, mongodb
+
+pmm_agent_listen_port: 7777
+pmm_agent_debug: false
+pmm_agent_trace: false
+
+pmm_metrics_mode: auto
+pmm_metrics_resolution: 1s
+pmm_metrics_retention: 30d

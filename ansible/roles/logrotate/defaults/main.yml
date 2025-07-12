@@ -1,0 +1,57 @@
+---
+# Default rotation frequency
+logrotate_frequency: "weekly"
+
+# Default rotation size
+logrotate_keep: 4
+
+# Default file permissions for new log files
+logrotate_compress: true
+
+# Default date extension for rotated logs
+logrotate_dateext: true
+
+# Global options
+logrotate_global_options:
+  - weekly
+  - rotate 4
+  - create
+  - dateext
+  - compress
+  - delaycompress
+  - missingok
+  - notifempty
+
+# Default entries that will always be configured
+logrotate_default_entries:
+  - name: syslog
+    path: /var/log/syslog
+    frequency: daily
+    options:
+      - rotate 7
+      - daily
+      - missingok
+      - notifempty
+      - compress
+      - delaycompress
+      - sharedscripts
+    create: "0640 root adm"
+    postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
+
+  - name: audit
+    path: /var/log/audit/audit.log
+    options:
+      - rotate 7
+      - weekly
+      - size 100M
+      - missingok
+      - notifempty
+      - compress
+      - delaycompress
+    create: "0640 root root"
+
+# User-defined entries (empty by default)
+logrotate_custom_entries: []
+
+# Combine default and custom entries
+logrotate_entries: "{{ logrotate_default_entries + logrotate_custom_entries }}"

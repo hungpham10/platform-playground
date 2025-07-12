@@ -1,0 +1,14 @@
+---
+- name: Include partition tasks
+  include_tasks: partition.yml
+  when: storage_devices | length > 0
+
+- name: Include LVM tasks
+  include_tasks: lvm.yml
+  when: storage_vgs | length > 0 or storage_lvs | length > 0
+
+- name: Include filesystem tasks
+  include_tasks: filesystem.yml
+
+- name: Include mount tasks
+  include_tasks: mount.yml

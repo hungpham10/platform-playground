@@ -1,0 +1,16 @@
+---
+- name: Configure DHCP Server
+  hosts: dhcp-server
+  vars:
+    dhcp_mode: server
+    dhcp_interface: eth0
+  roles:
+    - role: dhcp
+
+- name: Configure DHCP Client
+  hosts: dhcp-client
+  vars:
+    dhcp_mode: client
+    dhcp_interface: eth0
+  roles:
+    - role: dhcp

@@ -1,0 +1,25 @@
+network:
+  version: 2
+  ethernets:
+{% for item in net_interfaces %}
+    {{ item.name }}:
+{% if item.ip|default('')|length > 0 and item.netmask is defined %}
+      addresses:
+        - {{ item.ip }}/{{ item.netmask }}
+{% if item.gateway|length > 0 %}
+      gateway4: {{ item.gateway }}
+{% endif %}
+{% if item.routes|length > 0 %}
+      routes:
+{% for route in item.routes %}
+        - to: {{ route.to }}
+          via: {{ route.via }}
+{% endfor %}
+{% endif %}
+      nameservers:
+        addresses:
+          - {{ nameserver }}
+{% else %}
+      dhcp4: true
+{% endif %}
+{% endfor %}

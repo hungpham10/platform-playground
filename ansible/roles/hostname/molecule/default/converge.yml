@@ -1,0 +1,17 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    domain: "example.com"
+    net: "local"
+    master: "192.168.1.10"
+    ip: "192.168.1.10"
+    nodes:
+      - hostname: "master01"
+        ip: "192.168.1.10"
+      - hostname: "worker01"
+        ip: "192.168.1.11"
+  tasks:
+    - name: Include hostname role
+      include_role:
+        name: hostname

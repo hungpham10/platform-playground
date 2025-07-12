@@ -1,0 +1,45 @@
+---
+# UID ranges
+user_uid_ranges:
+  system:
+    start: 100
+    end: 999
+  regular:
+    start: 1000
+    end: 60000
+
+# Salt for password hashing
+user_password_salt: "{{ lookup('env', 'USER_PASSWORD_SALT') | default('changeme', true) }}"
+
+# Default system groups
+linux_system_groups:
+  - name: docker
+    gid: 1500
+    system: true
+  - name: devops
+    gid: 2000
+  - name: developers
+    gid: 2001
+  - name: admins
+    gid: 2002
+
+# Default system users
+linux_system_users:
+  - name: ansible
+    uid: 1500
+    system: true
+    groups: ['sudo']
+    ssh_keys:
+      - "{{ lookup('env', 'ANSIBLE_SSH_KEY') }}"
+    sudo: 'ALL=(ALL) NOPASSWD: ALL'
+
+# User and group configurations
+linux_groups: "{{ linux_system_groups + (additional_groups | default([])) }}"
+linux_users: "{{ linux_system_users + (additional_users | default([])) }}"
+
+# Password policies
+user_password_policies:
+  max_days: 90
+  min_days: 7
+  warn_days: 14
+  inactive_days: 30

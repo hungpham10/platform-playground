@@ -1,0 +1,77 @@
+---
+- name: Verify OS family
+  fail:
+    msg: "This role only supports RedHat family"
+  when: ansible_os_family != "RedHat"
+
+- name: Gather package facts
+  package_facts:
+    manager: auto
+
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop: "{{ asm_required_packages }}"
+
+- name: Include pkg role
+  include_role:
+    name: pkg
+  vars:
+    linux_add_packages_names: "{{ linux_add_packages_names }}"
+
+- name: Load kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - oracleasm
+    - asmlib
+
+- name: Configure ASM parameters
+  template:
+    src: oracleasm.conf.j2
+    dest: /etc/sysconfig/oracleasm
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart oracleasm
+
+- name: Configure multipath for ASM devices
+  template:
+    src: multipath.conf.j2
+    dest: /etc/multipath.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart multipathd
+
+- name: Initialize ASM
+  command: "/usr/sbin/oracleasm init"
+  args:
+    creates: /dev/oracleasm
+  notify: restart oracleasm
+
+- name: Create ASM disk groups
+  block:
+    - name: Scan for ASM disks
+      command: "/usr/sbin/oracleasm scandisks"
+      changed_when: false
+
+    - name: Create ASM disks
+      command: >
+        /usr/sbin/oracleasm createdisk {{ item.name }} {{ item.device }}
+      args:
+        creates: "/dev/oracleasm/disks/{{ item.name }}"
+      loop: "{{ asm_disks }}"
+
+    - name: Set ASM disk permissions
+      file:
+        path: "/dev/oracleasm/disks/{{ item.name }}"
+        owner: grid
+        group: asmadmin
+        mode: '0660'
+      loop: "{{ asm_disks }}"
+  when: inventory_hostname == groups['oracle_primary'][0]

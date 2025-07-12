@@ -1,0 +1,58 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: gateway
+    image: ubuntu:22.04
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: /sbin/init
+    capabilities:
+      - NET_ADMIN
+    groups:
+      - gateway
+
+  - name: instance
+    image: ubuntu:22.04
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: /sbin/init
+    capabilities:
+      - NET_ADMIN
+    groups:
+      - instance
+
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      gateway:
+        is_gateway_machine: true
+        enable_forwarding: true
+        net_interfaces:
+          - name: eth0
+            addresses: 
+              - "192.168.1.1/24"
+            gateway4: "192.168.0.1"
+            nameservers:
+              addresses: ["8.8.8.8", "8.8.4.4"]
+          - name: eth1
+            addresses:
+              - "10.0.0.1/24"
+      instance:
+        is_gateway_machine: false
+        enable_forwarding: false
+        net_interfaces:
+          - name: eth0
+            addresses:
+              - "192.168.1.10/24"
+            gateway4: "192.168.1.1"
+            nameservers:
+              addresses: ["8.8.8.8", "8.8.4.4"]
+
+verifier:
+  name: ansible

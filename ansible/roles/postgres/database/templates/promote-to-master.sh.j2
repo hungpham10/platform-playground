@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+echo "Promoting standby to master..."
+pg_ctl promote -D {{ postgres_data_dir }}
+
+echo "Waiting for promotion to complete..."
+while [ ! -f {{ postgres_data_dir }}/recovery.done ]; do
+  sleep 1
+done
+
+echo "Promotion complete. Node is now master."

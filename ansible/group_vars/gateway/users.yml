@@ -1,0 +1,12 @@
+
+role_users:
+  gateway:
+    - name: suricata
+      uid: 2003
+      groups: ['suricata']
+      ssh_keys: []
+
+role_groups:
+  gateway:
+    - name: suricata
+      gid: 2003

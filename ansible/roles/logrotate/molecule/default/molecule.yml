@@ -1,0 +1,25 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: default
+platforms:
+  - name: localhost
+    ansible_connection: local
+    ansible_host: localhost
+    ansible_user: root
+provisioner:
+  name: ansible
+  connection_options:
+    ansible_connection: local
+  config_options:
+    defaults:
+      transport: local
+      interpreter_python: auto_silent
+  inventory:
+    host_vars:
+      localhost:
+        ansible_connection: local
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
+verifier:
+  name: ansible

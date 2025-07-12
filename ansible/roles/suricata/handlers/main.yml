@@ -1,0 +1,12 @@
+# filepath: /Users/hungpham10/Desktop/Workspace/monorepo/pkg/ansible/roles/suricata/handlers/main.yml
+---
+- name: restart suricata
+  systemd:
+    name: suricata
+    state: restarted
+    daemon_reload: yes
+  become: true
+
+- name: reload ufw
+  ufw:
+    state: reloaded

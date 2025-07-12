@@ -1,0 +1,12 @@
+[Unit]
+Description=IPVS Scaling Service
+After=network.target keepalived.service
+
+[Service]
+Type=oneshot
+Environment="LOADBALANCER_USER={{ loadbalancer_user | default('devops') }}"
+ExecStart=/{{ ipvs_config_dir }}/ipvs-scaling.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

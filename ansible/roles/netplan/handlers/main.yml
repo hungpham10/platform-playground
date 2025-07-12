@@ -1,0 +1,4 @@
+---
+- name: apply netplan config
+  command: netplan apply
+  changed_when: true

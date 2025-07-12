@@ -1,0 +1,24 @@
+tiup_mirror: "https://tiup-mirrors.pingcap.com"
+tiup_user: "tidb"
+tiup_home: "/home/{{ tiup_user }}/.tiup"
+
+# Directories
+topo_dir: "{{ tiup_home }}/../"
+bin_dir: "{{ tiup_home }}/bin"
+deploy_dir: "/deploy/tidb-deploy"
+data_dir: "/data/tidb-data"
+
+# Tidb Version
+tidb_version: "v8.5.1"
+cluster_name: "tidb"
+
+# Ports
+pd_client_port: 2379
+pd_peer_port: 2380
+tidb_port: 4000
+tikv_status_port: 20180
+tikv_port: 20160
+cdc_port: 8300
+
+# SSH Configuration
+ssh_key_path: "/home/{{ tiup_user }}/.ssh/id_rsa"

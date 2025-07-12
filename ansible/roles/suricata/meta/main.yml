@@ -1,0 +1,17 @@
+# filepath: /Users/hungpham10/Desktop/Workspace/monorepo/pkg/ansible/roles/suricata/meta/main.yml
+---
+galaxy_info:
+  author: Your Name
+  description: Installs and configures Suricata with Lua support.
+  license: MIT
+  min_ansible_version: "2.0"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+  galaxy_tags:
+    - suricata
+    - security
+    - ids
+    - lua
+dependencies: []

@@ -1,0 +1,41 @@
+---
+# PostgreSQL configuration defaults
+postgres_defaults:
+  version: "14"
+  packages:
+    - postgresql
+    - postgresql-contrib
+    - python3-psycopg2
+    - pgbackrest
+  conf_dir: "/etc/postgresql/14/main"
+  data_dir: "/var/lib/postgresql/14/main"
+  backup_dir: "/var/lib/postgresql/backup"
+  max_connections: 100
+  shared_buffers: "128MB"
+  effective_cache_size: "4GB"
+  work_mem: "4MB"
+  maintenance_work_mem: "64MB"
+  listen_addresses: "*"
+  port: 5432
+  enable_backup: true
+  backup_schedule: "0 1 * * *"
+  backup_retention: 7
+  backup_compress: true
+
+# Database users
+database_users:
+  - name: app_user
+    password: "{{ vault_app_user_password }}"
+    flags: "NOSUPERUSER,NOCREATEDB"
+  - name: readonly_user
+    password: "{{ vault_readonly_user_password }}"
+    flags: "NOSUPERUSER,NOCREATEDB"
+
+# Databases
+database_list:
+  - name: app_db
+    owner: app_user
+    encoding: UTF8
+  - name: analytics_db
+    owner: readonly_user
+    encoding: UTF8

@@ -1,0 +1,16 @@
+[Unit]
+Description=Consul Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=consul
+Group=consul
+ExecStart=/usr/bin/consul agent -config-dir={{ consul_config_dir }}
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

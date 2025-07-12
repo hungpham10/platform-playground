@@ -1,0 +1,13 @@
+# Audit logs
+$FileCreateMode 0600
+
+if $programname == 'audispd' then {
+    action(
+        type="omfile"
+        file="{{ audit_log_path }}"
+        FileCreateMode="0600"
+        FileOwner="root"
+        FileGroup="root"
+    )
+    stop
+}

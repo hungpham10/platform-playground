@@ -1,0 +1,22 @@
+name: {{ etcd_name }}
+data-dir: {{ etcd_data_dir }}
+initial-cluster-state: {{ etcd_initial_cluster_state }}
+initial-cluster-token: {{ etcd_initial_cluster_token }}
+initial-cluster: {% for host in groups['etcd'] %}{{ hostvars[host]['ansible_hostname'] }}=https://{{ hostvars[host]['ansible_default_ipv4']['address'] }}:2380{% if not loop.last %},{% endif %}{% endfor %}
+
+listen-peer-urls: {{ etcd_listen_peer_urls }}
+listen-client-urls: {{ etcd_listen_client_urls }}
+advertise-client-urls: {{ etcd_advertise_client_urls }}
+initial-advertise-peer-urls: {{ etcd_initial_advertise_peer_urls }}
+
+client-transport-security:
+  cert-file: {{ etcd_cert }}
+  key-file: {{ etcd_key }}
+  trusted-ca-file: {{ etcd_ca_cert }}
+  client-cert-auth: true
+
+peer-transport-security:
+  cert-file: {{ etcd_cert }}
+  key-file: {{ etcd_key }}
+  trusted-ca-file: {{ etcd_ca_cert }}
+  client-cert-auth: true

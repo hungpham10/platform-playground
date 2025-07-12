@@ -1,0 +1,41 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure Gateway Instance
+  hosts: gateway-*
+  become: true
+  vars:
+    instance_role: gateway
+  roles:
+    - role: suricata
+      vars:
+        suricata_home_net: >-
+          {{
+            ([ansible_default_ipv4.network + '/' + (ansible_default_ipv4.netmask | ansible.utils.ipaddr('prefix') | string)]) +
+            (network_interfaces | selectattr('type', 'equalto', 'bridge') | map(attribute='addresses') | flatten | list)
+          }}
+        suricata_interfaces: >-
+          {{ network_interfaces }}
+      when: instance_role == 'gateway'
+      tags: ["security", "ids"]
+
+    # @TODO: thinking about using tftp on top of nfs/drbd and use ipvs to configure alias ip for fetching data
+    - role: tftp
+      vars:
+        tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
+        boot_menu_items: "{{ pxe_menu_items | default([]) }}"
+      when: instance_role == 'gateway'
+      tags: ["network", "tftp"]
+
+    # Setup ipvs to group tftp cluster
+    #- role: loadbalancer/ipvs
+    #  vars:
+    #    ipvs_services:
+    #      - name: tftp
+    #        address: "{{ gateway_virtual_ip }}"
+    #        port: 69
+    #        protocol: udp
+    #        scheduler: wrr
+    #        real_servers: "{{ gateway_real_servers }}"
+    #  when: instance_role == 'gateway' and gateway_virtual_ip is defined and gateway_real_servers is defined
+    #  tags: ["network", "ipvs", "tftp"]

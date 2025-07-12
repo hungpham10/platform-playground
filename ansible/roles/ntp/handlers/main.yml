@@ -1,0 +1,6 @@
+---
+- name: restart timesyncd
+  systemd:
+    name: systemd-timesyncd
+    state: restarted
+    daemon_reload: yes

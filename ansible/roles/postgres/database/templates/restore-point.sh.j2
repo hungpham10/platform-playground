@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+if [ -z "$1" ]; then
+    echo "Usage: $0 <point-in-time>"
+    echo "Example: $0 '2024-01-01 12:00:00'"
+    exit 1
+fi
+
+echo "Stopping PostgreSQL..."
+systemctl stop {{ postgres_service }}
+
+echo "Restoring to point in time: $1..."
+pgbackrest --stanza={{ pgbackrest_stanza_name }} --delta --type=time --target="$1" restore
+
+echo "Starting PostgreSQL..."
+systemctl start {{ postgres_service }}

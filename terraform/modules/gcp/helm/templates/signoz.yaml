@@ -1,0 +1,190 @@
+clickhouse:
+  enabled: true
+
+%{ if length(signoz_clickhouse_namespace) > 0 }
+  namespace: "${signoz_clickhouse_namespace}"
+%{ endif }
+
+%{ if signoz_clickhouse_node_selector is defined }
+  nodeSelector: "${signoz_clickhouse_node_selector}"
+%{ endif }
+
+  zookeeper:
+    enabled: true
+    replicaCount: ${signoz_zookeeper_replica_count|default(1)}
+
+  database: "${signoz_metric_database}"
+  traceDatabase: "${signoz_trace_database}"
+
+  user: "${signoz_admin_username}"
+  password: "${signoz_admin_password}"
+
+  persistence:
+    enabled: true
+
+  layout:
+    shardsCount: ${signoz_clickhouse_shards_count}
+    replicasCount: ${signoz_clickhouse_shards_count}
+
+  settings:
+    prometheus/metrics: true
+    prometheus/events: true
+    prometheus/asynchronous_metrics: true
+
+%{ if signoz_clickhouse_high_availability.enabled|default(properties.clickhous.ha.enabled|default(false))|bool }
+  podDistribution:
+%{ if signoz_clickhouse_high_availability.for_shard_anti_affinity|default(properties.clickhous.ha.for_shard_anti_affinity|default(true)) }
+    - type: ShardAntiAffinity
+      topologyKey: kubernetes.io/hostname
+%{ endif }
+%{ if signoz_clickhouse_high_availability.for_replica_anti_affinity|default(properties.clickhous.ha.for_replica_anti_affinity|default(true)) }
+    - type: ReplicaAntiAffinity
+      topologyKey: kubernetes.io/hostname
+%{ endif }
+    - type: MaxNumberPerNode
+      number: ${signoz_clickhouse_high_availability.max_per_node|default(properties.clickhous.ha.max_per_node|default(2))}
+      topologyKey: kubernetes.io/hostname
+%{ endif }
+
+  queryService:
+    ingress:
+      enable: false
+
+frontend:
+  fullname: "frontend"
+
+%{ if signoz_frontend_autoscaling is defined or properties.autoscaling is defined }
+  autoscaling:
+    enabled: true
+    minReplicas: ${signoz_frontend_autoscaling.replcas.min|default(properties.autoscaling.frontend.replicas.min|default(1))}
+    maxReplicas: ${signoz_frontend_autoscaling.replcas.max|default(properties.autoscaling.frontend.replicas.max|default(11))}
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 70
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 180
+
+      scaleUp:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+%{ endif }
+
+%{ if signoz_frontend_ingress.host|default(properties.ingress.host|default(''))|length > 0 }
+  ingress:
+    enabled: true
+
+    hosts:
+      - host: ${signoz_frontend_ingress.host|default(properties.ingress.host|default(''))}
+        paths:
+          - path: ${signoz_frontend_ingress.path|default(properties.ingress.path|default('/'))}
+            pathType: ${signoz_frontend_ingress.path_type|default(properties.ingress.path_type|default('ImplementationSpecific'))}
+            port: 3301
+%{ endif }
+
+
+otelCollector:
+%{ if signoz_otel_autoscaling is defined or properties.autoscaling is defined }
+  autoscaling:
+    enabled: true
+    minReplicas: ${signoz_frontend_autoscaling.replcas.min|default(properties.autoscaling.otel.replicas.min|default(1))}
+    maxReplicas: ${signoz_frontend_autoscaling.replcas.max|default(properties.autoscaling.otel.replicas.max|default(11))}
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 70
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 1
+            periodSeconds: 180
+
+      scaleUp:
+        stabilizationWindowSeconds: 300
+        policies:
+          - type: Pods
+            value: 2
+            periodSeconds: 60
+%{ endif }
+
+  ports:
+    prometheus:
+      enabled: false
+      containerPort: 8889
+      servicePort: 8889
+      nodePort: ""
+      protocol: TCP
+
+%{ if signoz_otel_ports.otlp|default(properties.ports.otlp|default(true)) }
+    otlp:
+      enabled: true
+      containerPort: 4317
+      servicePort: 4317
+      nodePort: ""
+      protocol: TCP
+
+    otlp-http:
+      enabled: true
+      containerPort: 4318
+      servicePort: 4318
+      nodePort: ""
+      protocol: TCP
+%{ endif }
+
+%{ if signoz_otel_ports.jaeger is defined or properties.ports.jaeger is defined }
+    jaeger-compact:
+      enabled: false
+      containerPort: 6831
+      servicePort: 6831
+      nodePort: ""
+      protocol: UDP
+
+%{ if signoz_otel_ports.jaeger.thrift|default(properties.ports.jaeger|default(false)) }
+    jaeger-thrift:
+      enabled: true
+      containerPort: 14268
+      servicePort: 14268
+      nodePort: ""
+      protocol: TCP
+%{ endif }
+
+%{ if signoz_otel_ports.jaeger.grpc|default(properties.ports.jaeger.grpc|default(false)) }
+    jaeger-grpc:
+      enabled: true
+      containerPort: 14250
+      servicePort: 14250
+      nodePort: ""
+      protocol: TCP
+%{ endif }
+%{ endif }
+
+%{ if signoz_otel_ports.zipkin|default(properties.ports.zipkin|default(false)) }
+    zipkin:
+      enabled: false
+      containerPort: 9411
+      servicePort: 9411
+      nodePort: ""
+      protocol: TCP
+%{ endif }
+
+    metrics:
+      enabled: true
+      containerPort: 8888
+      servicePort: 8888
+      nodePort: ""
+      protocol: TCP
+
+%{ if signoz_otel_ports.zpapers|default(properties.ports.zpapers|default(false)) }
+    zpages:
+      enabled: true
+      containerPort: 55679
+      servicePort: 55679
+      nodePort: ""
+      protocol: TCP
+%{ endif }

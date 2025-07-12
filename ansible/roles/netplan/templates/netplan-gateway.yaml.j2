@@ -1,0 +1,23 @@
+---
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+{% for interface in net_interfaces %}
+    {{ interface.name }}:
+      addresses:
+{% for addr in interface.addresses %}
+        - {{ addr }}
+{% endfor %}
+{% if interface.gateway4 is defined %}
+      gateway4: {{ interface.gateway4 }}
+{% endif %}
+{% if interface.nameservers is defined %}
+      nameservers:
+        addresses: {{ interface.nameservers.addresses | to_yaml }}
+{% endif %}
+{% if interface.routes is defined %}
+      routes:
+{{ interface.routes | to_nice_yaml(indent=8) }}
+{% endif %}
+{% endfor %}

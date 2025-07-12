@@ -1,0 +1,11 @@
+---
+- name: Converge
+  hosts: all
+  become: true
+  gather_facts: true  # Enable to get ansible_distribution_release
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: Include pkg role
+      include_role:
+        name: pkg

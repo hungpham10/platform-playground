@@ -1,0 +1,16 @@
+---
+citus_required_packages:
+  - postgresql-14-citus
+  - citus-toolkit
+
+citus_config_params:
+  - name: citus.max_partitions_per_node
+    value: 32
+  - name: citus.use_secondary_nodes
+    value: on
+
+citus_distributed_tables:
+  - table: events
+    column: event_id
+  - table: users
+    column: user_id

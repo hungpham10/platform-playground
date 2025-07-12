@@ -1,0 +1,87 @@
+#!/bin/bash
+
+# @TODO: improve by integrate with our agent so we can easy manage how many instance within our cluster
+function list_hosts_within_ipvs() {
+  echo ""
+}
+
+# @NOTE: improve by integrate with our agent so we can easy manage secret ssh key in one central system
+function get_ssh_key() {
+  echo ""
+}
+
+# Function to run healthchecks
+function run_healthchecks() {
+  local healthcheck_script
+  local healthcheck_result
+  local all_checks_passed=true
+
+  echo "Running healthchecks on $NEW_SERVER_IP..."
+  for healthcheck_script in "$HEALTHCHECKS_DIR"/*; do
+    if [ -x "$healthcheck_script" ]; then
+      echo "  Running $healthcheck_script..."
+      healthcheck_result=$("$healthcheck_script" "$NEW_SERVER_IP")
+      if [ "$healthcheck_result" -ne 0 ]; then
+        echo "    $healthcheck_script failed with exit code $healthcheck_result"
+        all_checks_passed=false
+      else
+        echo "    $healthcheck_script passed"
+      fi
+    fi
+  done
+
+  if [ "$all_checks_passed" = true ]; then
+    echo "All healthchecks passed on $NEW_SERVER_IP"
+    return 0 # Success
+  else
+    echo "Some healthchecks failed on $NEW_SERVER_IP"
+    return 1 # Failure
+  fi
+}
+
+IPVSADM_PATH="/sbin/ipvsadm" # Path to ipvsadm, adjust if needed
+IPVS_VIRTUAL_IP="{{ ipvs_virtual_ip }}" # Replace with your IPVS virtual IP
+IPVS_PORTS="{{ ipvs_ports | join(',') }}" # List of ports, comma-separated
+IPVS_REAL_SERVER_WEIGHT="1" # Weight for the new real server
+IPVS_SERVICES_SH="{{ ipvs_config_dir }}/ipvs-services.sh" # Path to ipvs-services.sh
+HEALTHCHECKS_DIR="{{ ipvs_config_dir }}/healthchecks" # Healthchecks directory
+
+# Get the new server's IP address from the specified interface
+NEW_SERVER_IP=$(ip addr show "$NEW_SERVER_INTERFACE" | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
+
+# Access environment variables
+LOADBALANCER_USER="${LOADBALANCER_USER}"
+LOADBALANCER_SSH_KEY=$(get_ssh_key "$LOADBALANCER_USER")
+
+# Validate healthcheck of current server
+echo "Validating healthcheck of current server $NEW_SERVER_IP..."
+if ! run_healthchecks; then
+  echo "Healthchecks failed. Not updating IPVS."
+  exit 1
+fi
+
+# Iterate through ports from the IPVS_PORTS variable and add the real server to each
+IFS=',' read -r -a PORTS <<< "$IPVS_PORTS"
+for PORT in "${PORTS[@]}"; do
+  # Construct the IPVS rule to add
+  IPVS_RULE="$IPVSADM_PATH -a -t $IPVS_VIRTUAL_IP:$port -r $NEW_SERVER_IP -m -w $IPVS_REAL_SERVER_WEIGHT"
+
+  for LOADBALANCER_HOST in $(list_hosts_within_ipvs); do
+    # Check if the IPVS rule already exists in ipvs-services.sh
+    if ! ssh -i "$LOADBALANCER_SSH_KEY" "$LOADBALANCER_USER@$LOADBALANCER_HOST" "grep -q '$IPVS_RULE' $IPVS_SERVICES_SH"; then
+      # Add the IPVS rule to ipvs-services.sh
+      echo "Adding IPVS rule to $IPVS_SERVICES_SH on $LOADBALANCER_HOST..."
+      ssh -i "$LOADBALANCER_SSH_KEY" "$LOADBALANCER_USER@$LOADBALANCER_HOST" "echo '$IPVS_RULE' | sudo tee -a $IPVS_SERVICES_SH"
+    else
+      echo "IPVS rule already exists in $IPVS_SERVICES_SH on $LOADBALANCER_HOST"
+    fi
+  done
+done
+
+# Reload IPVS services on the load balancer
+echo "Reloading IPVS services on $LOADBALANCER_HOST..."
+ssh -i "$LOADBALANCER_SSH_KEY" "$LOADBALANCER_USER@$LOADBALANCER_HOST" "sudo systemctl reload keepalived"
+
+echo "IPVS configuration updated and keepalived reloaded on $LOADBALANCER_HOST"
+
+exit 0

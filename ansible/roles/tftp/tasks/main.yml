@@ -1,0 +1,70 @@
+---
+- name: Create TFTP directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: tftp
+    group: tftp
+    mode: '0750'
+  loop:
+    - "{{ tftp_root }}/pxelinux.cfg"
+    - "{{ tftp_root }}/boot"
+    - "{{ tftp_root }}/images"
+
+- name: Configure TFTP server
+  template:
+    src: tftpd-hpa.j2
+    dest: /etc/default/tftpd-hpa
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart tftp
+
+- name: Copy PXE boot files
+  copy:
+    src: "/usr/lib/PXELINUX/{{ item }}"
+    dest: "{{ tftp_root }}/{{ item }}"
+    remote_src: yes
+    owner: tftp
+    group: tftp
+    mode: '0644'
+  loop:
+    - pxelinux.0
+
+- name: Copy ldlinux.c32
+  copy:
+    src: /usr/lib/syslinux/modules/bios/ldlinux.c32
+    dest: "{{ tftp_root }}/ldlinux.c32"
+    remote_src: yes
+    owner: tftp
+    group: tftp
+    mode: '0644'
+  become: true
+
+- name: Create symbolic link for boot-amd64 (if AMD64 architecture)
+  file:
+    src: /usr/share/cd-boot-images-amd64
+    dest: "{{ tftp_root }}/boot-amd64"
+    state: link
+    owner: tftp
+    group: tftp
+  become: true
+  when: ansible_architecture == "x86_64"
+
+- name: Create symbolic link for boot-arm64 (if ARM64 architecture)
+  file:
+    src: /usr/share/cd-boot-images-arm64
+    dest: "{{ tftp_root }}/boot-arm64"
+    state: link
+    owner: tftp
+    group: tftp
+  become: true
+  when: ansible_architecture == "aarch64"
+
+- name: Configure default PXE menu
+  template:
+    src: default.j2
+    dest: "{{ tftp_root }}/pxelinux.cfg/default"
+    owner: tftp
+    group: tftp
+    mode: '0644'

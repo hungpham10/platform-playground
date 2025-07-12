@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+echo "Starting incremental backup..."
+pgbackrest --stanza={{ pgbackrest_stanza_name }} --type=incr backup
+
+echo "Backup complete. Latest backups:"
+pgbackrest --stanza={{ pgbackrest_stanza_name }} info

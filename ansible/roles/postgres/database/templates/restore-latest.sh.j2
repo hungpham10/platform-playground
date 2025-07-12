@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+
+echo "Stopping PostgreSQL..."
+systemctl stop {{ postgres_service }}
+
+echo "Restoring latest backup..."
+pgbackrest --stanza={{ pgbackrest_stanza_name }} --delta restore
+
+echo "Starting PostgreSQL..."
+systemctl start {{ postgres_service }}

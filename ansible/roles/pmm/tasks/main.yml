@@ -1,0 +1,52 @@
+---
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop: "{{ pmm_required_packages }}"
+
+- name: Create PMM directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - "{{ pmm_config_dir }}"
+    - "{{ pmm_log_dir }}"
+
+- name: Configure PMM agent
+  template:
+    src: pmm-agent.yml.j2
+    dest: "{{ pmm_config_dir }}/pmm-agent.yml"
+    mode: '0640'
+  notify: restart pmm-agent
+
+- name: Configure systemd service
+  template:
+    src: pmm-agent.service.j2
+    dest: /etc/systemd/system/pmm-agent.service
+    mode: '0644'
+  notify: restart pmm-agent
+
+- name: Register node with PMM Server
+  command: 
+    cmd: >-
+      pmm-agent setup 
+      --config-file={{ pmm_config_dir }}/pmm-agent.yml 
+      --server-address={{ pmm_server_address }}
+      --server-username={{ pmm_server_username }}
+      --server-password={{ pmm_server_password }}
+      --node-name={{ pmm_node_name }}
+      --node-type={{ pmm_node_type }}
+      --force
+  register: pmm_setup
+  changed_when: pmm_setup.rc == 0
+  failed_when: pmm_setup.rc != 0 and 'already registered' not in pmm_setup.stderr
+
+- name: Start and enable PMM agent
+  systemd:
+    name: pmm-agent
+    state: started
+    enabled: yes

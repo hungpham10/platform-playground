@@ -1,0 +1,30 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: ntp-server
+    image: ubuntu:22.04
+    privileged: true
+    command: /sbin/init
+  - name: ntp-client
+    image: ubuntu:22.04
+    privileged: true
+    command: /sbin/init
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        ntp_upstream_servers:
+          - "0.pool.ntp.org"
+      ntp_server:
+        ntp_mode: server
+      ntp_client:
+        ntp_mode: client
+    host_vars:
+      ntp-client:
+        ntp_master_server: ntp-server
+verifier:
+  name: ansible

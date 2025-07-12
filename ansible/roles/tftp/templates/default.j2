@@ -1,0 +1,11 @@
+DEFAULT install
+PROMPT 0
+TIMEOUT {{ pxe_timeout | default(50) }}
+
+{% for item in boot_menu_items | default([]) %}
+LABEL {{ item.label }}
+    MENU LABEL {{ item.menu_label }}
+    KERNEL {{ item.kernel }}
+    INITRD {{ item.initrd }}
+    APPEND {{ item.append }}
+{% endfor %}

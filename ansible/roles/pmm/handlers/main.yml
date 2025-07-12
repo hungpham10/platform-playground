@@ -1,0 +1,5 @@
+---
+- name: restart pmm-agent
+  systemd:
+    name: pmm-agent
+    state: restarted

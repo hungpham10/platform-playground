@@ -1,0 +1,23 @@
+global {
+  usage-count no;
+  udev-always-use-vnr yes;
+}
+
+common {
+  net {
+    protocol {{ drbd_protocol | default('C') }};
+    after-sb-0pri discard-zero-changes;
+    after-sb-1pri discard-secondary;
+    after-sb-2pri disconnect;
+  }
+
+  disk {
+    disk-flushes yes;
+    disk-barrier no;
+    md-flushes yes;
+    c-plan-ahead {{ drbd_c_plan_ahead | default(20) }};
+    c-min-rate {{ drbd_c_min_rate | default(4194304) }};
+    c-max-rate {{ drbd_c_max_rate | default(4194304) }};
+    resync-rate {{ drbd_resync_rate | default('100M') }};
+  }
+}

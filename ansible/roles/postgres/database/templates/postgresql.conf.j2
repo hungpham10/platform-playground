@@ -1,0 +1,24 @@
+listen_addresses = '{{ postgres_listen_addresses }}'
+port = {{ postgres_port }}
+max_connections = {{ postgres_max_connections }}
+
+# Memory Configuration
+shared_buffers = {{ postgres_shared_buffers }}
+effective_cache_size = {{ postgres_effective_cache_size }}
+maintenance_work_mem = {{ postgres_maintenance_work_mem }}
+work_mem = {{ postgres_work_mem }}
+
+# WAL Configuration
+wal_level = {{ postgres_wal_level }}
+max_wal_senders = {{ postgres_max_wal_senders }}
+max_replication_slots = {{ postgres_max_replication_slots }}
+archive_mode = {{ postgres_archive_mode }}
+archive_command = '{{ postgres_archive_command }}'
+
+# Logging Configuration
+logging_collector = on
+log_directory = 'pg_log'
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+log_rotation_age = 1d
+log_rotation_size = 0
+log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '

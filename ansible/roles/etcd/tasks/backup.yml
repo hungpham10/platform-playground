@@ -1,0 +1,28 @@
+---
+- name: Create etcd backup directory
+  file:
+    path: "{{ etcd_backup_dir }}"
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: '0750'
+
+- name: Configure etcd backup scripts
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ etcd_script_dir }}/{{ item.dest }}"
+    mode: '0750'
+    owner: etcd
+    group: etcd
+  loop:
+    - { src: backup-etcd.sh.j2, dest: backup-etcd.sh }
+    - { src: restore-etcd.sh.j2, dest: restore-etcd.sh }
+    - { src: snapshot-etcd.sh.j2, dest: snapshot-etcd.sh }
+
+- name: Setup automated backups
+  cron:
+    name: "etcd-backup"
+    minute: "0"
+    hour: "*/6"
+    job: "{{ etcd_script_dir }}/backup-etcd.sh"
+    user: etcd

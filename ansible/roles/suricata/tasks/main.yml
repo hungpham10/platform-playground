@@ -1,0 +1,74 @@
+---
+- name: Create Suricata directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ suricata_user }}"
+    group: "{{ suricata_group }}"
+    mode: "0750"
+  loop:
+    - "{{ suricata_config_dir }}"
+    - "{{ suricata_rules_dir }}"
+    - "{{ suricata_log_dir }}"
+  
+- name: Check if Suricata rules directory exists
+  stat:
+    path: "{{ suricata_rules_dir }}"
+  register: suricata_rules_dir_stat
+
+- name: Count Suricata rules files
+  find:
+    paths: "{{ suricata_rules_dir }}"
+    patterns: "*.rules"
+  register: suricata_rules_files
+
+- name: Set Suricata rules variables
+  set_fact:
+    suricata_rules_dir_exists: "{{ suricata_rules_dir_stat.stat.exists }}"
+    suricata_rules_count: "{{ suricata_rules_files.files | length | int }}"
+
+- name: Create custom rules from templates
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ suricata_rules_dir }}/{{ item.dest }}"
+    owner: "{{ suricata_user }}"
+    group: "{{ suricata_group }}"
+    mode: "0644"
+  loop: "{{ suricata_custom_rules | default([]) }}"
+  become: true
+  notify: restart suricata
+
+- name: Add NFQUEUE rules to UFW's before.rules
+  blockinfile:
+    path: /etc/ufw/before.rules
+    block: |
+      # Custom NFQUEUE rules (added by Ansible)
+      -I INPUT 1 -p tcp --dport 22 -j NFQUEUE --queue-bypass
+      -I OUTPUT 1 -p tcp --sport 22 -j NFQUEUE --queue-bypass
+      -I FORWARD -j NFQUEUE
+      -I INPUT 2 -j NFQUEUE
+      -I OUTPUT 2 -j NFQUEUE
+
+    insertafter: '^\*filter'
+    marker: "# {mark} ANSIBLE MANAGED BLOCK - NFQUEUE RULES"
+  notify: reload ufw
+
+- name: Configure Suricata
+  template:
+    src: suricata.yaml.j2
+    dest: "{{ suricata_config_dir }}/suricata.yaml"
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: restart suricata
+
+- name: Configure Suricata service
+  template:
+    src: suricata.service.j2
+    dest: /etc/systemd/system/suricata.service
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: restart suricata

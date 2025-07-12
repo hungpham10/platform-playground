@@ -1,0 +1,21 @@
+# Basic configuration
+smtpd_banner = $myhostname ESMTP
+biff = no
+append_dot_mydomain = no
+readme_directory = no
+
+# TLS parameters
+smtp_tls_security_level = may
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+# Network configuration
+myhostname = {{ ansible_fqdn }}
+myorigin = $myhostname
+mydestination = $myhostname, localhost.$mydomain, localhost
+relayhost = {{ mail_relay_host | default('') }}
+inet_interfaces = loopback-only
+inet_protocols = ipv4
+
+# Queue configuration
+maximal_queue_lifetime = 1h
+bounce_queue_lifetime = 1h

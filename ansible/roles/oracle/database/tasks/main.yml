@@ -1,0 +1,87 @@
+---
+- name: Verify OS family
+  fail:
+    msg: "This role only supports RedHat family"
+  when: ansible_os_family != "RedHat"
+
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+  loop: "{{ oracle_required_packages }}"
+
+- name: Create Oracle directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: oracle
+    group: oinstall
+    mode: '0755'
+  loop:
+    - "{{ oracle_home }}"
+    - "{{ oracle_base }}"
+    - "{{ oracle_inventory }}"
+
+- name: Configure kernel parameters
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_file: /etc/sysctl.d/99-oracle-database.conf
+  loop: "{{ oracle_kernel_params }}"
+  notify: reload sysctl
+
+- name: Configure security limits
+  template:
+    src: oracle-limits.conf.j2
+    dest: /etc/security/limits.d/oracle-database.conf
+    mode: '0644'
+
+- name: Create response file
+  template:
+    src: db_install.rsp.j2
+    dest: "{{ oracle_home }}/db_install.rsp"
+    owner: oracle
+    group: oinstall
+    mode: '0644'
+
+- name: Extract Oracle installation files
+  unarchive:
+    src: "{{ oracle_installer_location }}/{{ oracle_installer_archive }}"
+    dest: "{{ oracle_home }}"
+    remote_src: yes
+    owner: oracle
+    group: oinstall
+  when: not ansible_check_mode
+
+- name: Install Oracle database software
+  command:
+    cmd: "./runInstaller -silent -responseFile {{ oracle_home }}/db_install.rsp"
+    chdir: "{{ oracle_home }}/database"
+  become: true
+  become_user: oracle
+  environment:
+    ORACLE_HOME: "{{ oracle_home }}"
+    ORACLE_BASE: "{{ oracle_base }}"
+  when: not ansible_check_mode
+
+- name: Run root scripts
+  command: "{{ item }}"
+  loop:
+    - "{{ oracle_inventory }}/orainstRoot.sh"
+    - "{{ oracle_home }}/root.sh"
+  when: not ansible_check_mode
+
+- name: Create database
+  command:
+    cmd: "dbca -silent -createDatabase -responseFile {{ oracle_home }}/dbca.rsp"
+    chdir: "{{ oracle_home }}/bin"
+  become: true
+  become_user: oracle
+  environment:
+    ORACLE_HOME: "{{ oracle_home }}"
+    ORACLE_SID: "{{ oracle_sid }}"
+  when: 
+    - not ansible_check_mode
+    - oracle_create_database | bool

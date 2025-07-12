@@ -1,0 +1,24 @@
+---
+server_address: {{ pmm_server_address }}
+server_username: {{ pmm_server_username }}
+server_password: {{ pmm_server_password }}
+server_insecure_tls: false
+
+listen_port: {{ pmm_agent_listen_port }}
+debug: {{ pmm_agent_debug | lower }}
+trace: {{ pmm_agent_trace | lower }}
+
+metrics:
+  mode: {{ pmm_metrics_mode }}
+  resolution: {{ pmm_metrics_resolution }}
+  retention: {{ pmm_metrics_retention }}
+
+paths:
+  exporters_base: /usr/local/percona/pmm2
+  node_exporter_base: /usr/local/percona/pmm2/node_exporter
+  postgres_exporter_base: /usr/local/percona/pmm2/postgres_exporter
+  tmp_dir: /tmp
+  
+log:
+  level: info
+  file: {{ pmm_log_dir }}/pmm-agent.log

@@ -1,0 +1,43 @@
+#!/bin/bash
+set -eo pipefail
+
+if [ $# -ne 1 ]; then
+    echo "Usage: $0 <snapshot-file>"
+    echo "Available snapshots:"
+    ls -l {{ etcd_backup_dir }}/*.snapshot
+    exit 1
+fi
+
+SNAPSHOT_FILE="$1"
+
+if [ ! -f "$SNAPSHOT_FILE" ]; then
+    echo "Snapshot file not found: $SNAPSHOT_FILE"
+    exit 1
+fi
+
+echo "Stopping etcd service..."
+systemctl stop etcd
+
+echo "Restoring from snapshot..."
+ETCDCTL_API=3 etcdctl snapshot restore "$SNAPSHOT_FILE" \
+  --data-dir="{{ etcd_data_dir }}" \
+  --name="{{ etcd_name }}" \
+  --initial-cluster="{{ etcd_initial_cluster }}" \
+  --initial-cluster-token="{{ etcd_initial_cluster_token }}" \
+  --initial-advertise-peer-urls="{{ etcd_initial_advertise_peer_urls }}"
+
+echo "Setting permissions..."
+chown -R etcd:etcd "{{ etcd_data_dir }}"
+
+echo "Starting etcd service..."
+systemctl start etcd
+
+echo "Waiting for etcd to be ready..."
+sleep 10
+
+echo "Verifying cluster health..."
+ETCDCTL_API=3 etcdctl endpoint health \
+  --endpoints={{ etcd_listen_client_urls }} \
+  --cacert={{ etcd_ca_cert }} \
+  --cert={{ etcd_cert }} \
+  --key={{ etcd_key }}

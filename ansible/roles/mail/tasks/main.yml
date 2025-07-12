@@ -1,0 +1,22 @@
+---
+- name: Install mail packages
+  package:
+    name:
+      - mailutils
+      - postfix
+    state: present
+
+- name: Configure postfix
+  template:
+    src: main.cf.j2
+    dest: /etc/postfix/main.cf
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart postfix
+
+- name: Ensure postfix is running
+  service:
+    name: postfix
+    state: started
+    enabled: yes

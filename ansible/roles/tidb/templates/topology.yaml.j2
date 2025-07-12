@@ -1,0 +1,98 @@
+# TiDB Cluster Topology Configuration
+global:
+  user: "{{ tiup_user }}"
+  ssh_port: 22
+  deploy_dir: "{{ deploy_dir }}"
+  data_dir: "{{ data_dir }}"
+  arch: "{{ 'arm64' if ansible_architecture in ['arm64', 'aarch64'] else 'amd64' }}"
+
+server_configs:
+  tidb:
+    log.slow-query-file: slow_query.log
+    performance.max-procs: {{ ansible_processor_vcpus }}
+    performance.tcp-keep-alive: true
+    labels:
+      zone: "{{ zone | default('zone1') }}"
+  
+  tikv:
+    readpool.storage.use-unified-pool: false
+    server.labels:
+      zone: "{{ zone | default('zone1') }}"
+    storage.block-cache.capacity: "{{ (ansible_memtotal_mb * 0.4) | int }}MB"
+    raftstore.capacity: "{{ (ansible_memtotal_mb * 0.4) | int }}MB"
+  
+  pd:
+    replication.enable-placement-rules: true
+    replication.location-labels: ["zone"]
+    schedule.leader-schedule-limit: 4
+    schedule.region-schedule-limit: 2048
+    schedule.replica-schedule-limit: 64
+
+{% if groups['monitoring'] is defined and groups['monitoring']|length > 0 %}
+monitoring_servers:
+{% for host in groups['monitoring'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    port: {{ prometheus_port }}
+    deploy_dir: "{{ deploy_dir }}/prometheus"
+    data_dir: "{{ data_dir }}/prometheus"
+{% endfor %}
+
+grafana_servers:
+{% for host in groups['monitoring'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    port: {{ grafana_port }}
+    deploy_dir: "{{ deploy_dir }}/grafana"
+{% endfor %}
+{% endif %}
+
+# Required components
+pd_servers:
+{% for host in groups['pd'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    name: pd{{ loop.index }}
+    client_port: {{ pd_client_port }}
+    peer_port: {{ pd_peer_port }}
+    deploy_dir: "{{ deploy_dir }}/pd"
+    data_dir: "{{ data_dir }}/pd"
+    config:
+      replication.enable-placement-rules: true
+{% endfor %}
+
+tidb_servers:
+{% for host in groups['tidb'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    port: {{ tidb_port }}
+    status_port: {{ tidb_status_port }}
+    deploy_dir: "{{ deploy_dir }}/tidb"
+    log_dir: "{{ deploy_dir }}/tidb/log"
+    config:
+      log.slow-threshold: 300
+      log.level: info
+      labels:
+        zone: "{{ hostvars[host].zone | default('zone1') }}"
+{% endfor %}
+
+tikv_servers:
+{% for host in groups['tikv'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    port: {{ tikv_port }}
+    status_port: {{ tikv_status_port }}
+    deploy_dir: "{{ deploy_dir }}/tikv"
+    data_dir: "{{ data_dir }}/tikv"
+    config:
+      server.labels:
+        zone: "{{ hostvars[host].zone | default('zone1') }}"
+      storage.block-cache.capacity: "{{ (hostvars[host].ansible_memtotal_mb * 0.4) | int }}MB"
+{% endfor %}
+
+{% if groups['cdc'] is defined and groups['cdc']|length > 0 %}
+cdc_servers:
+{% for host in groups['cdc'] %}
+  - host: {{ hostvars[host].ansible_host }}
+    port: {{ cdc_port }}
+    deploy_dir: "{{ deploy_dir }}/cdc"
+    data_dir: "{{ data_dir }}/cdc"
+    gc-ttl: 86400
+    tz: Asia/Ho_Chi_Minh
+{% endfor %}
+{% endif %}

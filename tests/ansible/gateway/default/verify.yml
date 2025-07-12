@@ -1,0 +1,57 @@
+---
+- name: Verify instance configuration
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Collect service facts
+      service_facts:
+      
+    - name: Verify required services
+      assert:
+        that:
+          - "ansible_facts.services['systemd-timesyncd.service'].state == 'running'"
+          - "ansible_facts.services['isc-dhcp-server.service'].state == 'running'"
+          - "ansible_facts.services['tftpd-hpa.service'].state == 'running'"
+          - "ansible_facts.services['suricata.service'].state == 'running'"
+        fail_msg: "Required services are not running"
+        success_msg: "All required services are running"
+
+    - name: Set expected gateway
+      set_fact:
+        expected_gateway: "{{ network_interfaces[0].gateway4 }} dev"
+
+    - name: Verify network configuration
+      command: ip route show
+      register: ip_route
+      changed_when: false
+      failed_when: false
+
+    - name: Assert network configuration
+      assert:
+        that:
+          - "ip_route.rc == 0"
+          - "expected_gateway in ip_route.stdout"
+        fail_msg: "Network configuration is incorrect. Expected {{ expected_gateway }} in {{ ip_route.stdout }}"
+        success_msg: "Network configuration verified"
+
+    - name: Verify audit configuration
+      block:
+        - name: Check audit rules
+          command: auditctl -l
+          register: audit_rules
+          changed_when: false
+
+        - name: Check audit daemon status
+          command: service auditd status
+          register: audit_status
+          changed_when: false
+
+        - name: Assert audit configuration
+          assert:
+            that:
+              - "audit_status.rc == 0"
+              - "'active (running)' in audit_status.stdout"
+              - "audit_rules.rc == 0"
+            fail_msg: "Audit configuration verification failed"
+            success_msg: "Audit configuration verified"
+      tags: ["verify", "audit"]

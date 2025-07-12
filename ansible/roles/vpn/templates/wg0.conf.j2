@@ -1,0 +1,31 @@
+[Interface]
+{% if vpn_mode == 'server' %}
+Address = {{ wg_address }}
+ListenPort = {{ wg_port }}
+PrivateKey = {{ lookup('file', wg_private_key_path) }}
+
+# PostUp rules for routing and NAT
+PostUp = {{ wg_postup_rules | join('; ') }}
+PostDown = {{ wg_postdown_rules | join('; ') }}
+
+[Peer]
+PublicKey = {{ wg_client_public_key }}
+PresharedKey = {{ lookup('file', wg_preshared_key_path) }}
+# Allow traffic from both VPN and client networks
+AllowedIPs = {{ wg_allowed_ips }}
+{% endif %}
+{% if vpn_mode == 'client' %}
+Address = {{ wg_client_address }}
+PrivateKey = {{ lookup('file', wg_private_key_path) }}
+
+# PostUp and PostDown rules for client routing
+PostUp = {{ wg_client_postup_rules | join('; ') }}
+PostDown = {{ wg_client_postdown_rules | join('; ') }}
+
+[Peer]
+PublicKey = {{ wg_server_public_key }}
+PresharedKey = {{ lookup('file', wg_preshared_key_path) }}
+Endpoint = {{ wg_server_endpoint }}:{{ wg_port }}
+AllowedIPs = {{ wg_allowed_ips }}
+PersistentKeepalive = 25
+{% endif %}

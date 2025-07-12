@@ -1,0 +1,40 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  vars_files:
+    - vars/main.yml
+  tasks:
+    - name: Gather package facts
+      package_facts:
+        manager: auto
+
+    - name: Verify required packages are installed
+      assert:
+        that:
+          - "'{{ item.name }}' in ansible_facts.packages"
+        fail_msg: "Package {{ item.name }} is not installed"
+        success_msg: "Package {{ item.name }} is installed"
+      loop: "{{ linux_add_packages_names }}"
+
+    - name: Verify repository keys are present
+      command: apt-key list
+      register: apt_keys
+      changed_when: false
+
+    - name: Check repository configurations
+      stat:
+        path: "/etc/apt/sources.list.d/{{ item }}"
+      register: repo_files
+      loop:
+        - "baltocdn_com_helm_stable_debian.list"
+        - "download_docker_com_linux_ubuntu.list"
+        - "pkgs_k8s_io_core_stable_v1_30_deb.list"
+
+    - name: Verify repository files exist
+      assert:
+        that:
+          - "item.stat.exists"
+        fail_msg: "Repository file {{ item.item }} is missing"
+        success_msg: "Repository file {{ item.item }} exists"
+      loop: "{{ repo_files.results }}"

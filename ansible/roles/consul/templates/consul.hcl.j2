@@ -1,0 +1,16 @@
+data_dir = "{{ consul_data_dir }}"
+log_level = "INFO"
+node_name = "{{ inventory_hostname }}"
+server = {{ consul_is_server | lower }}
+bootstrap_expect = {{ consul_bootstrap_expect }}
+ui_config {
+  enabled = true
+}
+bind_addr = "{{ ansible_default_ipv4.address }}"
+advertise_addr = "{{ ansible_default_ipv4.address }}"
+
+retry_join = [
+  {% for host in groups['consul'] %}
+  "{{ hostvars[host]['ansible_default_ipv4']['address'] }}",
+  {% endfor %}
+]

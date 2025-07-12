@@ -1,0 +1,15 @@
+---
+# Base package configuration
+base_package_keys: []
+
+base_package_repos: []
+
+base_packages:
+  - acl
+  - ufw
+  - auditd
+  - lvm2
+  - xfsprogs
+  - e2fsprogs
+  - parted
+  - btrfs-progs

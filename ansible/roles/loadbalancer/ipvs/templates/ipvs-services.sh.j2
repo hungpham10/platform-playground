@@ -1,0 +1,19 @@
+#!/bin/bash
+set -e
+
+# Clear existing IPVS rules
+ipvsadm -C
+
+{% for service in ipvs_virtual_services %}
+# Configure virtual service: {{ service.name }}
+ipvsadm -A -t {{ ipvs_virtual_ip }}:{{ service.port }} -s {{ service.scheduler }}
+
+# Add real servers
+{% for server in service.real_servers %}
+ipvsadm -a -t {{ ipvs_virtual_ip }}:{{ service.port }} -r {{ server.address }}:{{ server.port }} -w {{ server.weight }}
+{% endfor %}
+
+{% endfor %}
+
+# Save configuration
+ipvsadm-save -n > /etc/ipvsadm.rules

@@ -1,0 +1,8 @@
+#!/bin/bash
+set -e
+
+echo "Starting full backup..."
+pgbackrest --stanza={{ pgbackrest_stanza_name }} --type=full backup
+
+echo "Backup complete. Latest backups:"
+pgbackrest --stanza={{ pgbackrest_stanza_name }} info

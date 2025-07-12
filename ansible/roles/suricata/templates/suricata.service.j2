@@ -1,0 +1,13 @@
+# filepath: /Users/hungpham10/Desktop/Workspace/monorepo/pkg/ansible/roles/suricata/templates/suricata.service.j2
+[Unit]
+Description=Suricata Intrusion Detection Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/suricata --af-packet -c {{ suricata_config_dir }}/suricata.yaml
+Restart=on-failure
+User=root
+
+[Install]
+WantedBy=multi-user.target

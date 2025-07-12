@@ -1,0 +1,16 @@
+# filepath: /Users/hungpham10/Desktop/Workspace/monorepo/pkg/ansible/roles/suricata/defaults/main.yml
+---
+suricata_mode: "nfqueue"
+suricata_home_net: ""
+suricata_interface: ens160
+suricata_config_dir: /etc/suricata
+suricata_rules_dir: /etc/suricata/rules
+suricata_log_dir: /var/log/suricata
+suricata_pid_file: /var/run/suricata.pid
+suricata_user: suricata
+suricata_group: suricata
+suricata_ruleset: et.rules
+
+# NFQUEUE settings
+suricata_nfqueue_queue_ids: "0,1"  # Comma-separated list of queue IDs
+suricata_nfqueue_threads: 2

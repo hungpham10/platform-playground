@@ -1,0 +1,32 @@
+---
+patroni_required_packages:
+  - patroni
+  - python3-psycopg2
+  - python3-etcd
+
+patroni_config_dir: /etc/patroni
+patroni_data_dir: /var/lib/postgresql/patroni
+
+patroni_name: "{{ inventory_hostname }}"
+patroni_namespace: /service/
+patroni_scope: main
+
+# PostgreSQL configuration
+patroni_postgresql_listen: "*:5432"
+patroni_postgresql_connect_address: "{{ ansible_default_ipv4.address }}:5432"
+patroni_postgresql_data_dir: /var/lib/postgresql/patroni
+patroni_postgresql_bin_dir: /usr/lib/postgresql/15/bin
+
+# DCS configuration (etcd)
+patroni_etcd_hosts: 
+  - 127.0.0.1:2379
+
+# REST API
+patroni_restapi_listen: "*:8008"
+patroni_restapi_connect_address: "{{ ansible_default_ipv4.address }}:8008"
+patroni_restapi_username: admin
+patroni_restapi_password: "{{ vault_patroni_api_password }}"
+
+# Replication configuration
+patroni_replication_username: replicator
+patroni_replication_password: "{{ vault_patroni_replication_password }}"

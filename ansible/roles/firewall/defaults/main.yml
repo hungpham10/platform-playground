@@ -1,0 +1,25 @@
+---
+# Firewall state configuration
+firewall_defaults:
+  state: enabled
+  enabled: true
+
+# Default firewall policy
+firewall_policy: DENY
+
+# Default firewall rules
+firewall_rules:
+  tcp_ports:
+    - port: 22
+      comment: "SSH"
+    - port: 80
+      comment: "HTTP"
+    - port: 443
+      comment: "HTTPS"
+  udp_ports: []
+  custom: []
+
+# Logging configuration
+firewall_log_dropped_packets: true
+
+firewall_enabled: "{{ firewall_defaults.enabled | default(true) | bool }}"

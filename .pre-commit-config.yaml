@@ -1,0 +1,55 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+      - id: check-merge-conflict
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.81.0
+    hooks:
+      - id: terraform_fmt
+      - id: terraform_validate
+      - id: terraform_tflint
+      - id: terrascan
+  - repo: https://github.com/gruntwork-io/pre-commit
+    rev: v0.1.22
+    hooks:
+      - id: terraform-fmt
+      - id: terraform-validate
+      - id: tflint
+  - repo: https://github.com/ansible-community/ansible-lint.git
+    rev: v6.17.1
+    hooks:
+      - id: ansible-lint
+        files: \.(yaml|yml)$
+        entry: /bin/bash -c 'if echo "$@" | grep "^kubernetes/setup" | grep ".yaml" &> /dev/null; then ansible-lint --offline -p ./kubernetes/setup/; fi'
+  - repo: https://github.com/pryorda/dockerfilelint-precommit-hooks
+    rev: master
+    hooks:
+      - id: dockerfilelint
+        stages: [commit]
+  - repo: https://github.com/dnephin/pre-commit-golang.git
+    rev: master
+    hooks:
+      - id: go-fmt
+      - id: no-go-testing
+      - name: Start unit test of service agent
+        id: go-unit-tests
+        entry: /bin/bash -c 'cd ./services/agent &&
+          for FILE in "$@"; do
+            SOURCE=$(echo "$FILE" | sed -e "s/^services\/agent\///");
+            DIR=$(dirname $SOURCE);
+            NAME=$(basename $SOURCE | sed -e "s/\.go$//");
+
+            if echo $FILE | grep "unittest" | grep "_test.go" &> /dev/null; then
+              go test -v $(echo "$FILE" | sed -e "s/^services\/agent\///");
+            elif echo $NAME | grep "_test"; then
+              go test -v $DIR/${NAME}.go;
+            elif [ -f $DIR/${NAME}_test.go ]; then
+              go test -v $DIR/${NAME}_test.go;
+            else
+              echo "Not found test case for $FILE";
+            fi;
+          done'

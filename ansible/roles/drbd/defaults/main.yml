@@ -1,0 +1,45 @@
+---
+# Fencing configuration
+drbd_fence_timeout: 60
+drbd_promotion_delay: 30
+drbd_fence_script: "/usr/local/sbin/fence-peer.sh"
+drbd_split_brain_recover: "/usr/local/sbin/split-brain-recover.sh"
+
+# Service management
+drbd_managed_services:
+  - mysql
+  - nginx
+
+# Mount point configuration
+drbd_mount_point: /data
+
+# DRBD configuration
+drbd_initialize: false
+drbd_primary: false
+drbd_protocol: C
+drbd_c_plan_ahead: 20
+drbd_c_min_rate: 4194304
+drbd_c_max_rate: 4194304
+drbd_resync_rate: "100M"
+
+drbd_resources: []
+  # Example resource configuration:
+  # - name: data
+  #   device: /dev/drbd0
+  #   disk: /dev/vdb1
+  #   address: 192.168.1.10
+  #   peer_host: node2
+  #   peer_address: 192.168.1.11
+  #   port: 7788
+
+# Split-brain configuration
+drbd_split_brain_handler: "disconnect"  # Options: disconnect, discard-younger-primary, discard-least-changes
+drbd_notify_email: "root@localhost"
+drbd_automatic_recovery: true
+drbd_split_brain_recovery_timeout: 300
+
+# State change handler configuration
+drbd_primary_hooks:
+  - "systemctl start application.service"
+drbd_secondary_hooks:
+  - "systemctl stop application.service"

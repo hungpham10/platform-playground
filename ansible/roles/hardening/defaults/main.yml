@@ -1,0 +1,22 @@
+# Security limits configuration
+security_limits:
+  - domain: '@docker'
+    type: soft
+    item: nofile
+    value: 65535
+  - domain: '@docker'
+    type: hard
+    item: nofile
+    value: 65535
+  - domain: '@developers'
+    type: soft
+    item: nproc
+    value: 5000
+  - domain: '@developers'
+    type: hard
+    item: nproc
+    value: 5000
+
+# AIDE configuration
+enable_aide: false  # Disabled by default
+aide_db_file: /var/lib/aide/aide.db

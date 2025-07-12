@@ -1,0 +1,57 @@
+---
+# VPN mode: 'server' or 'client'
+vpn_mode: "server"
+
+# WireGuard interface configuration
+wg_interface: "wg0"
+wg_port: 51820
+wg_address: "10.8.0.1/24"
+wg_network: "10.8.0.0/24"
+
+# Server specific settings
+wg_private_key_path: "/etc/wireguard/private.key"
+wg_public_key_path: "/etc/wireguard/public.key"
+wg_preshared_key_path: "/etc/wireguard/preshared.key"
+
+# Client specific settings
+wg_client_address: "10.8.0.2/24"
+wg_server_public_key: ""
+wg_server_endpoint: ""
+
+# NAT and routing
+wg_postup_rules:
+  - "iptables -A FORWARD -i %i -j ACCEPT"
+  - "iptables -A FORWARD -o %i -j ACCEPT"
+  - "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+
+wg_postdown_rules:
+  - "iptables -D FORWARD -i %i -j ACCEPT"
+  - "iptables -D FORWARD -o %i -j ACCEPT"
+  - "iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE"
+
+# Allowed IPs for routing
+wg_allowed_ips: "10.8.0.0/24"
+
+# Client network configuration
+wg_client_networks:
+  - interface: "eth0"
+    network: "192.168.1.0/24"
+  - interface: "eth1"
+    network: "172.16.0.0/16"
+
+# Client routing rules
+wg_client_postup_rules:
+  - "ip rule add from 192.168.1.0/24 table 200"
+  - "ip rule add from 172.16.0.0/16 table 200"
+  - "ip route add default via {{ wg_server_address }} dev {{ wg_interface }} table 200"
+  - "iptables -A FORWARD -i %i -j ACCEPT"
+  - "iptables -A FORWARD -o %i -j ACCEPT"
+  - "iptables -t nat -A POSTROUTING -o %i -j MASQUERADE"
+
+wg_client_postdown_rules:
+  - "ip rule del from 192.168.1.0/24 table 200"
+  - "ip rule del from 172.16.0.0/16 table 200"
+  - "ip route del default via {{ wg_server_address }} dev {{ wg_interface }} table 200"
+  - "iptables -D FORWARD -i %i -j ACCEPT"
+  - "iptables -D FORWARD -o %i -j ACCEPT"
+  - "iptables -t nat -D POSTROUTING -o %i -j MASQUERADE"

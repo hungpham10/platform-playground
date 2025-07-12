@@ -1,0 +1,23 @@
+---
+# Network configuration mode
+network_mode: "static"  # Options: static, dhcp, gateway
+
+# DHCP configuration
+dhcp_enabled: false
+
+# NTP configuration
+ntp_defaults:
+  mode: "client"
+  upstream_servers:  # Used when not using gateway
+    - "0.pool.ntp.org"
+    - "1.pool.ntp.org"
+    - "2.pool.ntp.org"
+  use_gateway_server: false  # Set to true to use gateway as NTP server
+
+# VPN configuration
+enable_vpn: "{{ instance_role == 'gateway' and groups['gateway'] is defined }}"
+vpn_defaults:
+  mode: "disabled"  # Will be overridden for gateway
+  server_endpoint: ""
+  allowed_ips: ""
+  client_address: ""

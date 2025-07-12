@@ -1,0 +1,29 @@
+#!/bin/bash
+set -eo pipefail
+
+BACKUP_DIR="{{ etcd_backup_dir }}"
+BACKUP_FILE="etcd-$(date +%Y%m%d-%H%M%S).snapshot"
+RETENTION_DAYS="{{ etcd_backup_retention_days }}"
+
+# Create snapshot
+ETCDCTL_API=3 etcdctl snapshot save \
+  --endpoints={{ etcd_listen_client_urls }} \
+  --cacert={{ etcd_ca_cert }} \
+  --cert={{ etcd_cert }} \
+  --key={{ etcd_key }} \
+  "$BACKUP_DIR/$BACKUP_FILE"
+
+# Verify snapshot
+ETCDCTL_API=3 etcdctl snapshot status \
+  "$BACKUP_DIR/$BACKUP_FILE" \
+  --write-out=table
+
+# Cleanup old backups
+find "$BACKUP_DIR" -name "etcd-*.snapshot" -mtime +"$RETENTION_DAYS" -delete
+
+# Create backup metadata
+cat > "$BACKUP_DIR/$BACKUP_FILE.meta" <<EOF
+Backup Date: $(date)
+etcd Version: $(etcd --version | head -1)
+Cluster ID: $(ETCDCTL_API=3 etcdctl endpoint status --write-out json | jq -r '.[].Status.header.cluster_id')
+EOF

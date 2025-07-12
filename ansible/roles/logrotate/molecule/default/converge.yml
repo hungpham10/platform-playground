@@ -1,0 +1,24 @@
+---
+- name: Converge
+  hosts: all
+  vars:
+    logrotate_custom_entries:
+      - name: test-logs
+        path: /var/log/test/*.log
+        options:
+          - weekly
+          - size 25M
+          - rotate 7
+          - compress
+          - delaycompress
+          - missingok
+          - notifempty
+    logrotate_global_options:
+      - weekly
+      - rotate 4
+      - create
+      - dateext
+  tasks:
+    - name: Include logrotate role
+      include_role:
+        name: logrotate

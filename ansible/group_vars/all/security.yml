@@ -1,0 +1,31 @@
+---
+# VPN Configuration
+vpn_defaults:
+  server_endpoint: "vpn.example.com"
+  allowed_ips: "10.8.0.0/24"
+  client_address: "10.8.0.2/24"
+
+# Firewall defaults
+firewall_defaults:
+  state: enabled
+  log_dropped: true
+  forward_policy: DROP
+
+# Password policy configuration
+password_default_policies:
+  - key: PASS_MAX_DAYS
+    value: 90
+  - key: PASS_MIN_DAYS
+    value: 7
+  - key: PASS_WARN_AGE
+    value: 14
+  - key: PASS_MIN_LEN
+    value: 12
+  - key: UMASK
+    value: 027
+  - key: CREATE_HOME
+    value: "yes"
+  - key: USERGROUPS_ENAB
+    value: "yes"
+  - key: ENCRYPT_METHOD
+    value: "SHA512"

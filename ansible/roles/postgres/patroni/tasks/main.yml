@@ -1,0 +1,77 @@
+---
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop: "{{ patroni_required_packages }}"
+
+- name: Verify etcd cluster connectivity
+  command: "etcdctl --endpoints={{ patroni_etcd_hosts | join(',') }} cluster-health"
+  changed_when: false
+  register: etcd_health
+  failed_when: etcd_health.rc != 0
+
+- name: Create Patroni directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  loop:
+    - "{{ patroni_config_dir }}"
+    - "{{ patroni_data_dir }}"
+
+- name: Configure Patroni
+  template:
+    src: patroni.yml.j2
+    dest: "{{ patroni_config_dir }}/patroni.yml"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: restart patroni
+
+- name: Configure systemd service
+  template:
+    src: patroni.service.j2
+    dest: /etc/systemd/system/patroni.service
+    mode: '0644'
+  notify: restart patroni
+
+- name: Start and enable Patroni
+  systemd:
+    name: patroni
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Wait for Patroni API to become available
+  uri:
+    url: "http://{{ patroni_restapi_connect_address }}/cluster"
+    user: "{{ patroni_restapi_username }}"
+    password: "{{ patroni_restapi_password }}"
+    force_basic_auth: yes
+  register: result
+  until: result.status == 200
+  retries: 60
+  delay: 1
+
+- name: Configure notification script
+  template:
+    src: patroni-notify.sh.j2
+    dest: /usr/local/bin/patroni-notify.sh
+    mode: '0755'
+    owner: postgres
+    group: postgres
+  when: patroni_enable_notifications | bool
+
+- name: Create notification log directory
+  file:
+    path: /var/log/patroni
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  when: patroni_enable_notifications | bool

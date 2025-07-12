@@ -1,0 +1,60 @@
+---
+# PostgreSQL repository GPG keys
+role_package_keys:
+  database:
+    - url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+      state: present
+
+# PostgreSQL official repositories
+role_package_repos:
+  database:
+    - repo: "deb http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+      filename: "postgresql"
+      state: present
+
+# Required packages for PostgreSQL database servers
+role_packages:
+  database:
+    # Core PostgreSQL packages
+    - postgresql-14
+    - postgresql-client-14
+    - postgresql-contrib-14
+    - postgresql-14-repack
+    - libpq-dev
+
+    # PostgreSQL monitoring and logging
+    - pgbadger
+    - mailx
+    - mailutils
+    - postfix
+
+    # Python database adapters
+    - python3-psycopg2
+    - python3-pip
+    
+    # Backup and recovery tools
+    - pgbackrest
+    - barman
+    
+    # Monitoring and administration
+    - pg-activity
+    - pgbadger
+    - pgtop
+    
+    # Connection pooling
+    - pgpool2
+    - postgresql-client    
+
+    # Full text search
+    - postgresql-14-rum
+    - postgresql-14-trgm
+    
+    # Performance tools
+    - postgresql-14-hypopg
+    - postgresql-14-cron
+    - postgresql-14-partman
+    
+    # System utilities
+    - net-tools
+    - iotop
+    - sysstat

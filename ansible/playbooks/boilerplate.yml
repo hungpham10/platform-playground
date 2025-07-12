@@ -1,0 +1,223 @@
+---
+- name: Configure Base Instance
+  hosts: all
+  become: true
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "group_vars/all"
+        - "group_vars/{{ instance_role }}"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      stat:
+        path: "host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      tags: ["always"]
+      when: host_vars_dir.stat.exists
+
+  roles:
+    - role: users
+      vars:
+        linux_groups: >-
+          {{ 
+            (base_groups | default([])) +
+            (role_groups[instance_role] | default([])) +
+            (host_specific_groups | default([]))
+          }}
+        linux_users: >-
+          {{
+            (base_users | default([])) +
+            (role_users[instance_role] | default([])) +
+            (host_specific_users | default([]))
+          }}
+        user_password_salt: "{{ user_password_salt }}"
+      tags: ["system", "users", "security"]
+
+    - role: pkg
+      vars:
+        linux_add_packages_keys: >-
+          {{
+            (base_package_keys | default([])) +
+            (role_package_keys[instance_role] | default([])) +
+            (host_package_keys | default([]))
+          }}
+        linux_add_packages_repositories: >-
+          {{
+            (base_package_repos | default([])) +
+            (role_package_repos[instance_role] | default([])) +
+            (host_package_repos | default([]))
+          }}
+        linux_add_packages_names: >-
+          {{
+            (base_packages | default([])) +
+            (role_packages[instance_role] | default([])) +
+            (host_specific_packages | default([]))
+          }}
+      tags: ["system", "packages"]
+
+    - role: netplan
+      vars:
+        is_gateway_machine: "{{ instance_role == 'gateway' }}"
+        net_interfaces: "{{ network_interfaces }}"
+        enable_forwarding: "{{ network_defaults.enable_forwarding }}"
+      tags: ["network"]
+
+    - role: hostname
+      vars:
+        domain: "{{ network_defaults.domain | default('lab') }}"
+        net: "{{ network_defaults.net | default('local') }}"
+        nodes: >-
+          {{
+            [{
+              'hostname': inventory_hostname,
+              'ip': ansible_default_ipv4.address
+            }] + 
+            (cluster_nodes | default([]))
+          }}
+      tags: ["network", "hostname"]
+
+    - role: dhcp
+      vars:
+        dhcp_defaults: "{{ dhcp_configs }}"
+        dhcp_enable_auto_provision: "{{ dhcp_configs.enable_auto_provision | default(false) }}"
+        dhcp_provision_playbook: "{{ playbook_dir }}/site.yml"
+      when:
+        - dhcp_enabled | bool 
+        - dhcp_configs | default([]) | length > 0
+      tags: ["network", "dhcp"]
+
+    - role: firewall
+      vars:
+        firewall_state: "{{ firewall_defaults.state | default('enabled') }}"
+        firewall_enabled: "{{ firewall_defaults.enabled | default(true) }}"
+        firewall_policy: "{{ firewall_defaults.policy | default('allow') }}"
+        firewall_allowed_tcp_ports: "{{ firewall_rules.tcp_ports | default([]) }}"
+        firewall_allowed_udp_ports: "{{ firewall_rules.udp_ports | default([]) }}"
+        firewall_additional_rules: "{{ firewall_rules.custom | default([]) }}"
+      tags: ["security", "firewall"]
+
+    - role: vpn
+      vars:
+        vpn_mode: "{{ 'server' if instance_role == 'gateway' else network_defaults.vpn_mode }}"
+        vpn_server_endpoint: "{{ vpn_defaults.server_endpoint }}"
+        wg_client_address: "{{ vpn_defaults.client_address }}"
+        wg_allowed_ips: "{{ vpn_defaults.allowed_ips }}"
+      when: 
+        - enable_vpn | bool
+        - instance_role != 'gateway'
+      tags: ["security", "vpn"]
+
+    - role: vpn
+      vars:
+        vpn_mode: "{{ vpn_defaults.mode }}"
+        vpn_server_endpoint: "{{ vpn_defaults.server_endpoint }}"
+        wg_client_address: "{{ vpn_defaults.client_address }}"
+        wg_allowed_ips: "{{ vpn_defaults.allowed_ips }}"
+      when: 
+        - enable_vpn | bool
+        - instance_role == 'gateway'
+      tags: ["security", "vpn"]
+
+    - role: ntp
+      vars:
+        ntp_mode: "{{ 'server' if instance_role == 'gateway' else ntp_defaults.mode }}"
+        ntp_master_server: >-
+          {{
+            ntp_upstream_servers 
+            if instance_role == 'gateway' 
+            else (groups['gateway'][0] if (groups['gateway'] is defined and ntp_defaults.use_gateway_server) 
+            else ntp_defaults.upstream_servers)
+          }}
+      tags: ["system", "time"]
+
+    - role: storage
+      vars:
+        storage_devices: "{{ instance_storage_devices | default([]) }}"
+        storage_vgs: "{{ instance_storage_vgs | default([]) }}"
+        storage_lvs: "{{ instance_storage_lvs | default([]) }}"
+      tags: ["storage"]
+
+    - role: audit
+      vars:
+        audit_rules: "{{ audit_rules | default([]) }}"
+        audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
+        audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
+        audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
+        audit_num_logs: "{{ audit_num_logs | default(5) }}"
+        audit_space_left: "{{ audit_space_left | default(75) }}"
+        audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
+        audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
+        audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
+      tags: ["security", "audit"]
+
+    - role: users
+      vars:
+        linux_groups: >-
+          {{ 
+            (base_groups | default([])) +
+            (role_groups[instance_role] | default([])) +
+            (host_specific_groups | default([]))
+          }}
+        linux_users: >-
+          {{
+            (base_users | default([])) +
+            (role_users[instance_role] | default([])) +
+            (host_specific_users | default([]))
+          }}
+        user_password_salt: "{{ user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
+      tags: ["system", "users", "security"]
+
+    - role: hardening
+      vars:
+        security_required_packages: "{{ security_packages | default([]) }}"
+        sysctl_security_params: "{{ sysctl_params | default([]) }}"
+        password_policies: "{{ password_default_policies | default([]) }}"
+        remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
+        enable_aide: "{{ enable_file_integrity | default(false) }}"
+        aide_rules: "{{ file_integrity_rules | default([]) }}"
+        audit_rules: "{{ system_audit_rules | default([]) }}"
+      tags: ["security", "hardening"]
+
+  post_tasks:
+    - name: Verify all services are running
+      service_facts:
+      tags: ["verify"]
+
+    - name: Check service status
+      assert:
+        that: "{{ role_service_checks[instance_role] | default([]) }}"
+        fail_msg: "Some required services are not running"
+        success_msg: "All required services are running"
+      tags: ["verify"]
+
+    - name: Verify storage configuration
+      block:
+        - name: Check mount points
+          command: findmnt {{ item.mount_point }}
+          register: mount_status
+          failed_when: false
+          changed_when: false
+          loop: "{{ instance_storage_devices | default([]) + storage_lvs | default([]) }}"
+          when: item.state | default('present') == 'present'
+
+        - name: Verify mounted filesystems
+          assert:
+            that:
+              - "item.rc == 0"
+            fail_msg: "Mount point {{ item.item.mount_point }} is not properly configured"
+            success_msg: "Mount point {{ item.item.mount_point }} is configured correctly"
+          loop: "{{ mount_status.results }}"
+          when: item is not skipped
+      tags: ["verify", "storage"]

@@ -1,0 +1,111 @@
+---
+- name: Verify required security packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required security package {{ item }} is not installed"
+    success_msg: "Security package {{ item }} is present"
+  loop: "{{ security_required_packages }}"
+
+- name: Include OS-specific variables
+  include_vars: "{{ ansible_os_family | lower }}.yml"
+
+- name: Configure system-wide security limits
+  template:
+    src: security-limits.conf.j2
+    dest: /etc/security/limits.conf
+    mode: '0644'
+  notify: reload pam
+
+- name: Configure sysctl security parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop: "{{ sysctl_security_params }}"
+
+- name: Configure SSH hardening
+  template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    mode: '0600'
+    validate: '/usr/sbin/sshd -t -f %s'
+  notify: restart sshd
+
+- name: Set password policies
+  lineinfile:
+    path: /etc/login.defs
+    regexp: "^{{ item.key }}"
+    line: "{{ item.key }} {{ item.value }}"
+  loop: "{{ password_policies }}"
+
+- name: Configure PAM password quality
+  template:
+    src: pwquality.conf.j2
+    dest: /etc/security/pwquality.conf
+    mode: '0644'
+  notify: reload pam
+
+- name: Configure AIDE
+  block:
+    - name: Create AIDE directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0750'
+        owner: root
+        group: root
+      loop:
+        - /etc/aide
+        - /var/lib/aide
+        - /var/log/aide
+
+    - name: Configure AIDE rules
+      template:
+        src: aide.conf.j2
+        dest: /etc/aide/aide.conf
+        mode: '0600'
+        owner: root
+        group: root
+      notify: initialize aide database
+
+    - name: Check AIDE database exists
+      stat:
+        path: "{{ aide_db_file }}"
+      register: aide_db_file
+
+    - name: Initialize AIDE database
+      command: aide --init
+      args:
+        creates: /var/lib/aide/aide.db.new
+      register: aide_init
+      notify: copy aide database
+
+    - name: Configure AIDE file integrity monitoring
+      template:
+        src: aide.conf.j2
+        dest: /etc/aide/aide.conf
+        mode: '0644'
+      notify: initialize aide database
+  when: enable_aide | bool
+  tags: ["aide"]
+
+- name: Configure auditd rules
+  template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/hardening.rules
+    mode: '0600'
+  notify: restart auditd
+
+- name: Remove dangerous SUID/SGID binaries
+  file:
+    path: "{{ item }}"
+    mode: '0755'
+  loop: "{{ remove_suid_sgid_files }}"
+
+- name: Configure system umask
+  lineinfile:
+    path: /etc/profile
+    regexp: '^umask'
+    line: 'umask 027'

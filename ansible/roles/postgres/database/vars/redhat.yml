@@ -1,0 +1,8 @@
+---
+postgres_repo_path: /etc/yum.repos.d/pgdg.repo
+postgres_packages:
+  - postgresql{{ postgres_version }}-server
+  - postgresql{{ postgres_version }}-contrib
+  - python3-psycopg2
+postgres_service: postgresql-{{ postgres_version }}
+postgres_initdb_cmd: /usr/pgsql-{{ postgres_version }}/bin/postgresql-{{ postgres_version }}-setup initdb

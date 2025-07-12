@@ -1,0 +1,10 @@
+---
+- name: Create partitions
+  parted:
+    device: "{{ item.device }}"
+    number: 1
+    state: present
+    part_end: "{{ item.size }}"
+    part_type: primary
+  loop: "{{ storage_devices }}"
+  when: item.state == 'present'

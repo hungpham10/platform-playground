@@ -1,0 +1,10 @@
+[Time]
+{% if ntp_defaults.use_gateway_server | bool and instance_role != 'gateway' %}
+NTP={{ hostvars[groups['gateway'][0]]['ansible_host'] }}
+{% else %}
+NTP={{ ntp_defaults.upstream_servers | join(' ') }}
+{% endif %}
+FallbackNTP=0.pool.ntp.org 1.pool.ntp.org
+RootDistanceMaxSec=5
+PollIntervalMinSec=32
+PollIntervalMaxSec=2048

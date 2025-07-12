@@ -1,0 +1,24 @@
+---
+- name: Verify timesyncd configuration
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Collect service facts
+      service_facts:
+
+    - name: Verify timesyncd service
+      assert:
+        that:
+          - "'systemd-timesyncd.service' in ansible_facts.services"
+          - "ansible_facts.services['systemd-timesyncd.service'].state == 'running'"
+          - "ansible_facts.services['systemd-timesyncd.service'].status == 'enabled'"
+
+    - name: Check timesyncd configuration file
+      stat:
+        path: /etc/systemd/timesyncd.conf
+      register: config_file
+
+    - name: Verify configuration file
+      assert:
+        that:
+          - "config_file.exists"

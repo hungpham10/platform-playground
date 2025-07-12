@@ -1,0 +1,39 @@
+---
+ipvs_required_packages:
+  - ipvsadm
+  - keepalived
+
+ipvs_config_dir: /etc/ipvs
+
+ipvs_virtual_ip: 192.168.1.100
+
+# Virtual Services Configuration
+ipvs_virtual_services:
+  - name: postgres_primary
+    port: 5432
+    protocol: tcp
+    scheduler: wrr  # wrr, rr, lc, wlc, etc
+    real_servers:
+      - address: 192.168.1.11
+        port: 5432
+        weight: 100
+      - address: 192.168.1.12
+        port: 5432
+        weight: 100
+
+# Keepalived Configuration
+ipvs_vrrp_instance: VI_1
+ipvs_vrrp_interface: eth0
+ipvs_vrrp_state: MASTER  # MASTER or BACKUP
+ipvs_vrrp_priority: 100
+ipvs_vrrp_virtual_router_id: 51
+ipvs_vrrp_password: "secretpass"
+
+# Sysctl Parameters
+ipvs_sysctl_params:
+  - key: net.ipv4.vs.conntrack
+    value: 1
+  - key: net.ipv4.vs.expire_nodest_conn
+    value: 1
+  - key: net.ipv4.vs.expire_quiescent_template
+    value: 1

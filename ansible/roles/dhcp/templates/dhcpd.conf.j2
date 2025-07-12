@@ -1,0 +1,36 @@
+# DHCP Server Configuration
+default-lease-time 600;
+max-lease-time 7200;
+
+{% for interface in dhcp_defaults.interfaces %}
+# Network configuration for {{ interface.name }}
+subnet {{ interface.subnet }} netmask {{ interface.netmask }} {
+  range {{ interface.range_start }} {{ interface.range_end }};
+  option routers {{ interface.router }};
+  option domain-name-servers {{ interface.nameservers | join(', ') }};
+
+{% if interface.netboot | default(false) %}
+  filename "pxelinux.0";
+  next-server {{ dhcp_defaults.tftp_server | default(interface.router) }};
+{% endif %}
+}
+{% endfor %}
+
+# Event scripts
+on commit {
+    set ClientIP = binary-to-ascii(10, 8, ".", leased-address);
+    set ClientName = pick-first-value(host-name, option host-name, "unknown");
+    execute("/usr/local/bin/dhcp-event.sh", "commit", ClientName, ClientIP);
+}
+
+on release {
+    set ClientIP = binary-to-ascii(10, 8, ".", leased-address);
+    set ClientName = pick-first-value(host-name, option host-name, "unknown");
+    execute("/usr/local/bin/dhcp-event.sh", "release", ClientName, ClientIP);
+}
+
+on expiry {
+    set ClientIP = binary-to-ascii(10, 8, ".", leased-address);
+    set ClientName = pick-first-value(host-name, option host-name, "unknown");
+    execute("/usr/local/bin/dhcp-event.sh", "expiry", ClientName, ClientIP);
+}

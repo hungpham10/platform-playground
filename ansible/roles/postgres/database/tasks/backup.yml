@@ -1,0 +1,43 @@
+---
+- name: Create pgBackRest directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  loop:
+    - "{{ pgbackrest_config_path }}"
+    - "{{ pgbackrest_log_path }}"
+    - "{{ pgbackrest_backup_path }}"
+
+- name: Configure pgBackRest
+  template:
+    src: pgbackrest.conf.j2
+    dest: "{{ pgbackrest_config_path }}/pgbackrest.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+
+- name: Create pgBackRest stanza
+  command: "pgbackrest --stanza={{ pgbackrest_stanza_name }} stanza-create"
+  become: true
+  become_user: postgres
+  register: stanza_create
+  changed_when: stanza_create.rc == 0
+  failed_when: 
+    - stanza_create.rc != 0 
+    - "'already exists' not in stanza_create.stderr"
+
+- name: Create backup scripts
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ pgbackrest_script_path }}/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  loop:
+    - { src: backup-full.sh.j2, dest: backup-full.sh }
+    - { src: backup-incremental.sh.j2, dest: backup-incremental.sh }
+    - { src: restore-latest.sh.j2, dest: restore-latest.sh }
+    - { src: restore-point.sh.j2, dest: restore-point.sh }

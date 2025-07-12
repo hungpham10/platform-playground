@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+
+{{ config.path }} {
+    {{ config.frequency | default(logrotate_frequency) }}
+{% for option in config.options %}
+    {{ option }}
+{% endfor %}
+{% if config.create is defined %}
+    create {{ config.create }}
+{% endif %}
+{% if config.postrotate_script is defined %}
+    postrotate
+        {{ config.postrotate_script }}
+    endscript
+{% endif %}
+{% if config.prerotate_script is defined %}
+    prerotate
+        {{ config.prerotate_script }}
+    endscript
+{% endif %}
+}

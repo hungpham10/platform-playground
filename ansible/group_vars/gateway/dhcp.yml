@@ -1,0 +1,17 @@
+# DHCP configuration
+dhcp_enabled: true
+
+dhcp_configs:
+  mode: server
+  enable_auto_provision: true
+  interfaces:
+    - name: ens160
+      subnet: "192.168.116.0"
+      netmask: "255.255.255.0"
+      range_start: "192.168.116.100"
+      range_end: "192.168.116.200"
+      router: "192.168.116.254"
+      netboot: true
+      nameservers:
+        - "8.8.8.8"
+        - "8.8.4.4"

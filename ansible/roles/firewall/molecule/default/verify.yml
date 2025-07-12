@@ -1,0 +1,78 @@
+---
+- name: Verify
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: Check if firewalld service is running
+      service_facts:
+      register: services_state
+
+    - name: Verify firewalld is running
+      assert:
+        that:
+          - "'firewalld.service' in services_state.ansible_facts.services"
+          - "services_state.ansible_facts.services['firewalld.service'].state == 'running'"
+
+    - name: Check if UFW is installed
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify UFW installation
+      assert:
+        that:
+          - "'ufw' in ansible_facts.packages"
+        fail_msg: "UFW is not installed"
+        success_msg: "UFW is installed correctly"
+
+    - name: Get UFW status
+      command: ufw status verbose
+      register: ufw_status
+      changed_when: false
+
+    - name: Verify UFW is enabled
+      assert:
+        that:
+          - "'Status: active' in ufw_status.stdout"
+        fail_msg: "UFW is not enabled"
+        success_msg: "UFW is enabled"
+
+    - name: Verify default policy
+      assert:
+        that:
+          - "'Default: deny (incoming)' in ufw_status.stdout"
+        fail_msg: "Default policy is not DROP"
+        success_msg: "Default policy is correctly set to DROP"
+
+    - name: Verify TCP ports
+      assert:
+        that:
+          - "item ~ '/tcp' in ufw_status.stdout"
+        fail_msg: "TCP port {{ item }} not configured"
+        success_msg: "TCP port {{ item }} correctly configured"
+      loop: "{{ firewall_rules.tcp_ports }}"
+
+    - name: Verify UDP ports
+      assert:
+        that:
+          - "item ~ '/udp' in ufw_status.stdout"
+        fail_msg: "UDP port {{ item }} not configured"
+        success_msg: "UDP port {{ item }} correctly configured"
+      loop: "{{ firewall_rules.udp_ports }}"
+
+    - name: Verify custom rules
+      assert:
+        that:
+          - "item in ufw_status.stdout"
+        fail_msg: "Custom rule '{{ item }}' not configured"
+        success_msg: "Custom rule '{{ item }}' correctly configured"
+      loop: "{{ firewall_rules.custom }}"
+      when: firewall_rules.custom | length > 0
+
+    - name: Check UFW logging
+      assert:
+        that:
+          - "'Logging: on' in ufw_status.stdout"
+        fail_msg: "UFW logging is not enabled"
+        success_msg: "UFW logging is enabled"
+      when: firewall_log_dropped_packets | bool

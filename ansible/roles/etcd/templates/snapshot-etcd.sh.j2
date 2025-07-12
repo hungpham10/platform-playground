@@ -1,0 +1,24 @@
+#!/bin/bash
+set -eo pipefail
+
+# Get current status before snapshot
+echo "Current cluster status:"
+ETCDCTL_API=3 etcdctl endpoint status \
+  --endpoints={{ etcd_listen_client_urls }} \
+  --cacert={{ etcd_ca_cert }} \
+  --cert={{ etcd_cert }} \
+  --key={{ etcd_key }} \
+  --write-out=table
+
+# Take snapshot
+SNAPSHOT_FILE="{{ etcd_backup_dir }}/etcd-$(date +%Y%m%d-%H%M%S).snapshot"
+ETCDCTL_API=3 etcdctl snapshot save \
+  --endpoints={{ etcd_listen_client_urls }} \
+  --cacert={{ etcd_ca_cert }} \
+  --cert={{ etcd_cert }} \
+  --key={{ etcd_key }} \
+  "$SNAPSHOT_FILE"
+
+# Verify snapshot
+echo -e "\nSnapshot verification:"
+ETCDCTL_API=3 etcdctl snapshot status "$SNAPSHOT_FILE" --write-out=table

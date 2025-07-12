@@ -1,0 +1,15 @@
+handlers {
+    # Basic handlers
+    before-resync-target "/usr/local/sbin/drbd-state-change %R before-resync %N";
+    after-resync-target "/usr/local/sbin/drbd-state-change %R after-resync %N";
+    
+    # Fencing handlers
+    fence-peer "{{ drbd_fence_script }} %N fence";
+    unfence-peer "{{ drbd_fence_script }} %N unfence";
+    
+    # Split-brain handling
+    split-brain "/usr/local/sbin/drbd-state-change %R split-brain %N";
+    
+    # State change handler
+    state-change "/usr/local/sbin/drbd-state-change %R %P %S %N %NS";
+}

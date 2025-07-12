@@ -1,0 +1,22 @@
+---
+firewall_rules:
+  tcp_ports:
+    - port: 22    
+      comment: "SSH"
+    - port: 80    
+      comment: "HTTP"
+    - port: 443   
+      comment: "HTTPS"
+    - port: 1194  
+      comment: "OpenVPN"
+  udp_ports:
+    - port: 53    
+      comment: "DNS"
+    - port: 123   
+      comment: "NTP"
+    - port: 51820 
+      comment: "WireGuard"
+  custom:
+    - "-A FORWARD -i eth1 -o eth0 -j ACCEPT"
+    - "-A FORWARD -i eth0 -o eth1 -m state --state ESTABLISHED,RELATED -j ACCEPT"
+    - "-t nat -A POSTROUTING -o eth0 -j MASQUERADE"

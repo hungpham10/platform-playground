@@ -1,0 +1,90 @@
+---
+- name: Load DRBD kernel module
+  modprobe:
+    name: drbd
+    state: present
+  register: drbd_module
+
+- name: Configure DRBD global settings
+  template:
+    src: global_common.conf.j2
+    dest: /etc/drbd.d/global_common.conf
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart drbd
+
+- name: Configure DRBD resources
+  template:
+    src: resource.conf.j2
+    dest: "/etc/drbd.d/{{ item.name }}.res"
+    mode: '0644'
+    owner: root
+    group: root
+  loop: "{{ drbd_resources }}"
+  notify: restart drbd
+
+- name: Create DRBD metadata
+  command: "drbdadm create-md {{ item.name }}"
+  args:
+    creates: "/sys/block/drbd{{ index }}"
+  loop: "{{ drbd_resources }}"
+  loop_control:
+    index_var: index
+  when: drbd_initialize | bool
+
+- name: Start DRBD resources
+  command: "drbdadm up {{ item.name }}"
+  loop: "{{ drbd_resources }}"
+  when: drbd_initialize | bool
+
+- name: Initialize primary node
+  command: "drbdadm primary --force {{ item.name }}"
+  loop: "{{ drbd_resources }}"
+  when: 
+    - drbd_initialize | bool
+    - drbd_primary | bool
+
+- name: Install state change handler script
+  template:
+    src: drbd-state-change.sh.j2
+    dest: /usr/local/sbin/drbd-state-change
+    mode: '0755'
+    owner: root
+    group: root
+
+- name: Configure state change handler
+  template:
+    src: handlers.d.j2
+    dest: /etc/drbd.d/handlers.d
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart drbd
+
+- name: Install fence peer script
+  template:
+    src: fence-peer.sh.j2
+    dest: "{{ drbd_fence_script }}"
+    mode: '0700'
+    owner: root
+    group: root
+  when: drbd_fence_method is defined
+
+- name: Install split brain recover manual script
+  template:
+    src: split-brain-recover.sh.j2
+    dest: "{{ drbd_split_brain_recover }}"
+    mode: '0700'
+    owner: root
+    group: root
+  when: drbd_split_brain_method is defined
+
+- name: Install required fencing packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ drbd_fence_packages }}"
+  when: 
+    - ansible_os_family == 'Debian'
+    - drbd_fence_method is defined

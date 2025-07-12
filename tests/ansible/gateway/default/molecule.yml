@@ -1,0 +1,48 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: default
+platforms:
+  - name: gateway-1
+    ansible_host: "${INSTANCE_IP}"
+    ansible_user: "${INSTANCE_USER}"
+    instance_gw: "${INSTANCE_GW}"
+    ansible_ssh_private_key_file: "${SSH_KEY_PATH}"
+    ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+    ansible_become: true
+    ansible_become_method: sudo
+    ansible_become_password: "${SUDO_PASSWORD}"
+    instance_role: gateway
+provisioner:
+  name: ansible
+  env:
+    ANSIBLE_ROLES_PATH: ../../../pkg/ansible/roles
+  config_options:
+    defaults:
+      remote_tmp: /tmp/ansible
+      host_key_checking: false
+    privilege_escalation:
+      become: true
+      become_method: sudo
+      become_ask_pass: false
+  inventory:
+    host_vars:
+      gateway-1:
+        ansible_host: "${INSTANCE_IP}"
+        ansible_user: "${INSTANCE_USER}"
+        ansible_ssh_private_key_file: "${SSH_KEY_PATH}"
+        ansible_become: true
+        ansible_become_method: sudo
+        ansible_become_password: "${SUDO_PASSWORD}"
+        network_interfaces:
+          - name: ens160
+            addresses:
+              - "${INSTANCE_IP}/24"
+            gateway4: "${INSTANCE_GW}"
+            nameservers:
+              addresses: ["8.8.8.8", "8.8.4.4"]
+        public_gateway: "${INSTANCE_GW}"
+        instance_role: gateway
+verifier:
+  name: ansible

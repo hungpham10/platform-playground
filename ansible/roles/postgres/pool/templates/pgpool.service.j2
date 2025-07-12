@@ -1,0 +1,15 @@
+[Unit]
+Description=PgPool-II middleware for PostgreSQL
+After=network.target
+
+[Service]
+Type=forking
+User=postgres
+Group=postgres
+PIDFile={{ pgpool_run_dir }}/pgpool.pid
+ExecStart=/usr/sbin/pgpool -f {{ pgpool_config_dir }}/pgpool.conf
+ExecStop=/usr/bin/pgpool stop
+ExecReload=/usr/bin/pgpool reload
+
+[Install]
+WantedBy=multi-user.target

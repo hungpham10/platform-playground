@@ -1,0 +1,114 @@
+---
+- name: Verify DHCP configuration variables
+  assert:
+    that:
+      - dhcp_defaults is defined
+      - dhcp_defaults.mode is defined
+      - dhcp_defaults.mode in ['server', 'client', 'disabled']
+      - (dhcp_defaults.mode == 'server' and dhcp_defaults.interfaces is defined) or 
+        (dhcp_defaults.mode != 'server')
+    fail_msg: "Required DHCP variables not set correctly"
+
+- name: Verify interface existence
+  command: ip link show {{ item.name }}
+  register: interface_check
+  changed_when: false
+  failed_when: interface_check.rc != 0
+  loop: "{{ dhcp_defaults.interfaces | default([]) }}"
+  when: dhcp_defaults.mode == 'server'
+
+- name: Configure DHCP server
+  block:
+    - name: Configure DHCP server configuration
+      template:
+        src: dhcpd.conf.j2
+        dest: /etc/dhcp/dhcpd.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart dhcp
+
+    - name: Validate DHCP configuration
+      command: dhcpd -t -cf /etc/dhcp/dhcpd.conf
+      register: dhcp_validate
+      changed_when: false
+      failed_when: dhcp_validate.rc != 0
+      become: true
+      retries: 2
+      delay: 5
+      until: dhcp_validate is success
+
+    - name: Configure DHCP server interfaces
+      template:
+        src: isc-dhcp-server.j2
+        dest: /etc/default/isc-dhcp-server
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart dhcp
+
+    - name: Enable and start DHCP server
+      service:
+        name: isc-dhcp-server
+        state: started
+        enabled: yes
+  when: dhcp_defaults.mode == 'server'
+
+- name: Configure DHCP event handling
+  block:
+    - name: Create event handler script
+      template:
+        src: dhcp-event.sh.j2
+        dest: /usr/local/bin/dhcp-event.sh
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create dynamic inventory directory
+      file:
+        path: "{{ dhcp_dynamic_inventory_file | default('/tmp/dhcp_inventory') | dirname }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Ensure event log directory exists
+      file:
+        path: /var/log
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    - name: Create empty event log
+      copy:
+        content: ""
+        dest: /var/log/dhcp-events.log
+        force: no
+        mode: '0644'
+        owner: root
+        group: root
+  when: 
+    - dhcp_defaults.mode == 'server'
+    - dhcp_defaults.enable_auto_provision | default(false) | bool
+
+- name: Configure DHCP client
+  block:
+    - name: Configure DHCP client configuration
+      template:
+        src: dhclient.conf.j2
+        dest: /etc/dhcp/dhclient.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart networking
+
+    - name: Ensure NetworkManager is not managing interfaces
+      template:
+        src: networkmanager.conf.j2
+        dest: /etc/NetworkManager/conf.d/10-dhcp-interfaces.conf
+        mode: '0644'
+        owner: root
+        group: root
+      notify: restart networkmanager
+  when: dhcp_defaults.mode == 'client'

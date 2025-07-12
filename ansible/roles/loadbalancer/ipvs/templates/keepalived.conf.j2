@@ -1,0 +1,19 @@
+global_defs {
+   router_id {{ ansible_hostname }}
+}
+
+vrrp_instance {{ ipvs_vrrp_instance }} {
+    state {{ ipvs_vrrp_state }}
+    interface {{ ipvs_vrrp_interface }}
+    virtual_router_id {{ ipvs_vrrp_virtual_router_id }}
+    priority {{ ipvs_vrrp_priority }}
+    authentication {
+        auth_type PASS
+        auth_pass {{ ipvs_vrrp_password }}
+    }
+    virtual_ipaddress {
+        {% for service in ipvs_virtual_services %}
+        {{ service.vip }}
+        {% endfor %}
+    }
+}

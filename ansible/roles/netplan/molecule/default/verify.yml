@@ -1,0 +1,68 @@
+---
+- name: Verify Gateway Configuration
+  hosts: gateway
+  tasks:
+    - name: Check netplan configuration
+      stat:
+        path: /etc/netplan/99-configure-interfaces.yaml
+      register: netplan_conf
+
+    - name: Verify netplan configuration
+      assert:
+        that:
+          - netplan_conf.stat.exists
+          - netplan_conf.stat.mode == '0600'
+        fail_msg: "Netplan configuration file missing or wrong permissions"
+        success_msg: "Netplan configuration file exists with correct permissions"
+
+    - name: Check IP forwarding
+      command: sysctl net.ipv4.ip_forward
+      register: ip_forward
+      changed_when: false
+
+    - name: Verify IP forwarding
+      assert:
+        that:
+          - "'net.ipv4.ip_forward = 1' in ip_forward.stdout"
+        fail_msg: "IP forwarding is not enabled"
+        success_msg: "IP forwarding is enabled"
+
+    - name: Check network configuration
+      command: ip addr show
+      register: ip_addr
+      changed_when: false
+
+    - name: Verify network interfaces
+      assert:
+        that:
+          - "'192.168.1.1/24' in ip_addr.stdout"
+          - "'10.0.0.1/24' in ip_addr.stdout"
+        fail_msg: "Network interfaces not configured correctly"
+        success_msg: "Network interfaces configured correctly"
+
+- name: Verify Instance Configuration
+  hosts: instance
+  tasks:
+    - name: Check network configuration
+      command: ip addr show
+      register: ip_addr
+      changed_when: false
+
+    - name: Verify network interface
+      assert:
+        that:
+          - "'192.168.1.10/24' in ip_addr.stdout"
+        fail_msg: "Network interface not configured correctly"
+        success_msg: "Network interface configured correctly"
+
+    - name: Check IP forwarding (should be disabled)
+      command: sysctl net.ipv4.ip_forward
+      register: ip_forward
+      changed_when: false
+
+    - name: Verify IP forwarding is disabled
+      assert:
+        that:
+          - "'net.ipv4.ip_forward = 0' in ip_forward.stdout"
+        fail_msg: "IP forwarding should be disabled"
+        success_msg: "IP forwarding is correctly disabled"

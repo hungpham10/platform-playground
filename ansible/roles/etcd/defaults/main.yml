@@ -1,0 +1,25 @@
+---
+etcd_version: "3.5.9"
+etcd_checksum: "sha256:e2969ebf2095677907c85e7879ee197cfce5b14b36598a321d3cd4d736f31196"
+
+etcd_conf_dir: /etc/etcd
+etcd_data_dir: /var/lib/etcd
+
+etcd_name: "{{ inventory_hostname }}"
+etcd_initial_cluster_state: "new"
+etcd_initial_cluster_token: "etcd-cluster-1"
+
+etcd_listen_peer_urls: "https://{{ ansible_default_ipv4.address }}:2380"
+etcd_listen_client_urls: "https://{{ ansible_default_ipv4.address }}:2379,https://127.0.0.1:2379"
+etcd_advertise_client_urls: "https://{{ ansible_default_ipv4.address }}:2379"
+etcd_initial_advertise_peer_urls: "https://{{ ansible_default_ipv4.address }}:2380"
+
+etcd_cert_dir: /etc/etcd/ssl
+etcd_ca_cert: "{{ etcd_cert_dir }}/ca.pem"
+etcd_cert: "{{ etcd_cert_dir }}/server.pem"
+etcd_key: "{{ etcd_cert_dir }}/server-key.pem"
+
+# Backup Configuration
+etcd_backup_dir: /var/lib/etcd/backup
+etcd_script_dir: /usr/local/bin
+etcd_backup_retention_days: 7

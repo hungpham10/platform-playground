@@ -1,0 +1,15 @@
+---
+# Required packages
+netplan_required_packages:
+  - netplan.io
+  - networkd-dispatcher
+
+# Network configuration
+is_gateway_machine: false
+enable_forwarding: false
+net_interfaces: []
+
+# Bridge configuration
+bridges_file: ""
+
+default_inet_name: "eth0"

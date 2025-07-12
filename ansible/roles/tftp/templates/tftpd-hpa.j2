@@ -1,0 +1,4 @@
+TFTP_USERNAME="tftp"
+TFTP_DIRECTORY="{{ tftp_root }}"
+TFTP_ADDRESS="{{ tftp_bind_address | default('0.0.0.0:69') }}"
+TFTP_OPTIONS="--secure --create {{ '--verbose' if tftp_verbose | default(false) else '' }}"

@@ -1,0 +1,25 @@
+---
+grid_version: "19.3.0"
+grid_base: /u01/app/grid
+grid_home: /u01/app/grid/product/19.3.0/grid
+oracle_inventory: /u01/app/oraInventory
+scan_port: 1521
+
+oracle_cluster_name: raccluster
+scan_name: racscan.example.com
+
+private_network:
+  interface: eth1
+  subnet: "10.0.0.0"
+  netmask: "255.255.255.0"
+
+public_network:
+  interface: eth0
+  subnet: "192.168.1.0"
+  netmask: "255.255.255.0"
+
+oracle_cluster_nodes:
+  - name: rac1
+    vip: 192.168.1.21
+  - name: rac2
+    vip: 192.168.1.22

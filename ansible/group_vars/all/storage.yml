@@ -1,0 +1,12 @@
+---
+# Default storage configuration
+storage_defaults:
+  mount_options: defaults
+  owner: root
+  group: root
+  mode: '0755'
+
+# Default LVM configuration
+lvm_defaults:
+  pesize: "4M"
+  vg_options: ""

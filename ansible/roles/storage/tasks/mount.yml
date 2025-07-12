@@ -1,0 +1,22 @@
+---
+- name: Create mount points
+  file:
+    path: "{{ item.mount_point }}"
+    state: directory
+    owner: "{{ item.owner | default('root') }}"
+    group: "{{ item.group | default('root') }}"
+    mode: "{{ item.mode | default('0755') }}"
+  loop: "{{ storage_devices + storage_lvs }}"
+  when: item.state | default('present') == 'present'
+
+- name: Mount filesystems
+  mount:
+    path: "{{ item.mount_point }}"
+    src: "{{ item.device if 'device' in item else '/dev/' + item.vg + '/' + item.name }}"
+    fstype: "{{ item.fstype }}"
+    opts: "{{ item.opts | default('defaults,noatime') if item.fstype == 'btrfs' else item.opts | default('defaults') }}"
+    dump: "{{ item.dump | default('0') }}"
+    passno: "{{ item.passno | default('2') }}"
+    state: mounted
+  loop: "{{ storage_devices + storage_lvs }}"
+  when: item.state | default('present') == 'present'

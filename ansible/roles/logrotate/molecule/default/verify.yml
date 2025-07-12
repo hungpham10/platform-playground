@@ -1,0 +1,134 @@
+---
+- name: Verify
+  hosts: all
+  tasks:
+    - name: Get apt package status for logrotate
+      command: dpkg-query -W -f='${Status}' logrotate
+      register: logrotate_status
+      changed_when: false
+      failed_when: false
+
+    - name: Verify logrotate installation
+      assert:
+        that:
+          - "'install ok installed' in logrotate_status.stdout"
+        fail_msg: "Logrotate is not installed via apt"
+        success_msg: "Logrotate is installed correctly via apt"
+
+    - name: Check logrotate.conf exists
+      stat:
+        path: /etc/logrotate.conf
+      register: logrotate_conf
+
+    - name: Verify logrotate.conf
+      assert:
+        that:
+          - logrotate_conf.stat.exists
+          - logrotate_conf.stat.mode == '0644'
+        fail_msg: "logrotate.conf does not exist or has wrong permissions"
+        success_msg: "logrotate.conf exists with correct permissions"
+
+    - name: Get logrotate.conf content
+      command: cat /etc/logrotate.conf
+      register: logrotate_conf_content
+      changed_when: false
+
+    - name: Verify global options
+      assert:
+        that:
+          - "'weekly' in logrotate_conf_content.stdout"
+          - "'rotate 4' in logrotate_conf_content.stdout"
+          - "'create' in logrotate_conf_content.stdout"
+          - "'dateext' in logrotate_conf_content.stdout"
+        fail_msg: "Global options not found in logrotate.conf"
+        success_msg: "Global options configured correctly"
+
+    - name: Check test-logs configuration
+      stat:
+        path: /etc/logrotate.d/test-logs
+      register: test_logs_conf
+
+    - name: Verify test-logs configuration
+      assert:
+        that:
+          - test_logs_conf.stat.exists
+          - test_logs_conf.stat.mode == '0644'
+        fail_msg: "test-logs configuration does not exist or has wrong permissions"
+        success_msg: "test-logs configuration exists with correct permissions"
+
+    - name: Get test-logs content
+      command: cat /etc/logrotate.d/test-logs
+      register: test_logs_content
+      changed_when: false
+
+    - name: Verify test-logs options
+      assert:
+        that:
+          - "'/var/log/test/*.log' in test_logs_content.stdout"
+          - "'weekly' in test_logs_content.stdout"
+          - "'size 25M' in test_logs_content.stdout"
+          - "'rotate 7' in test_logs_content.stdout"
+          - "'compress' in test_logs_content.stdout"
+          - "'delaycompress' in test_logs_content.stdout"
+          - "'missingok' in test_logs_content.stdout"
+          - "'notifempty' in test_logs_content.stdout"
+        fail_msg: "test-logs options not configured correctly"
+        success_msg: "test-logs options configured correctly"
+
+    - name: Check default logrotate configurations exist
+      stat:
+        path: "/etc/logrotate.d/{{ item }}"
+      register: logrotate_configs
+      loop:
+        - syslog
+        - audit
+
+    - name: Verify default configurations
+      assert:
+        that:
+          - item.stat.exists
+          - item.stat.mode == '0644'
+        fail_msg: "Default logrotate configuration {{ item.item }} missing or incorrect permissions"
+        success_msg: "Default logrotate configuration {{ item.item }} exists with correct permissions"
+      loop: "{{ logrotate_configs.results }}"
+
+    - name: Get syslog configuration content
+      command: cat /etc/logrotate.d/syslog
+      register: syslog_content
+      changed_when: false
+
+    - name: Verify syslog configuration
+      assert:
+        that:
+          - "'rotate 7' in syslog_content.stdout"
+          - "'daily' in syslog_content.stdout"
+          - "'create 0640 root adm' in syslog_content.stdout"
+        fail_msg: "Syslog configuration is incorrect"
+        success_msg: "Syslog configuration is correct"
+
+    - name: Get audit configuration content
+      command: cat /etc/logrotate.d/audit
+      register: audit_content
+      changed_when: false
+
+    - name: Verify audit configuration
+      assert:
+        that:
+          - "'rotate 7' in audit_content.stdout"
+          - "'size 100M' in audit_content.stdout"
+          - "'create 0640 root root' in audit_content.stdout"
+        fail_msg: "Audit configuration is incorrect"
+        success_msg: "Audit configuration is correct"
+
+    - name: Test logrotate configuration syntax
+      command: logrotate -d /etc/logrotate.conf
+      register: logrotate_test
+      changed_when: false
+      ignore_errors: true
+
+    - name: Verify logrotate configuration syntax
+      assert:
+        that:
+          - logrotate_test.rc == 0
+        fail_msg: "Logrotate configuration syntax test failed"
+        success_msg: "Logrotate configuration syntax test passed"

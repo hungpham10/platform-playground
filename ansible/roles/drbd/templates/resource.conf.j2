@@ -1,0 +1,25 @@
+resource {{ item.name }} {
+  device minor {{ index }};
+  meta-disk internal;
+  
+  net {
+    protocol {{ drbd_protocol | default('C') }};
+    allow-two-primaries no;
+    after-sb-0pri discard-zero-changes;
+    after-sb-1pri consensus;
+    after-sb-2pri {{ drbd_split_brain_handler }};
+    rr-conflict {{ drbd_split_brain_handler }};
+   }
+
+  on {{ ansible_hostname }} {
+    device     {{ item.device }};
+    disk       {{ item.disk }};
+    address    {{ item.address }}:{{ item.port | default(7788) }};
+  }
+
+  on {{ item.peer_host }} {
+    device     {{ item.device }};
+    disk       {{ item.disk }};
+    address    {{ item.peer_address }}:{{ item.port | default(7788) }};
+  }
+}

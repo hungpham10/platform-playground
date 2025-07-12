@@ -1,0 +1,36 @@
+---
+instance_role: gateway
+
+network_defaults:
+  enable_forwarding: true
+  dhcp_mode: server
+  dhcp_subnet: "192.168.1.0"
+  dhcp_range_start: "192.168.1.100"
+  dhcp_range_end: "192.168.1.200"
+
+# NTP Server Configuration
+ntp_upstream_servers:
+  - "0.pool.ntp.org"
+  - "1.pool.ntp.org"
+  - "2.pool.ntp.org"
+
+# Gateway-specific firewall rules
+role_firewall_rules:
+  gateway:
+    - "-A FORWARD -i eth1 -o eth0 -j ACCEPT"
+    - "-A FORWARD -i eth0 -o eth1 -m state --state ESTABLISHED,RELATED -j ACCEPT"
+    - "-t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+
+# Gateway-specific packages
+role_packages:
+  - name: isc-dhcp-server
+    state: present
+  - name: bind9
+    state: present
+
+# Service checks for gateway role
+role_service_checks:
+  gateway:
+    - "'running' in ansible_facts.services['systemd-networkd.service'].state"
+    - "'running' in ansible_facts.services['isc-dhcp-server.service'].state"
+    - "'running' in ansible_facts.services['systemd-timesyncd.service'].state"

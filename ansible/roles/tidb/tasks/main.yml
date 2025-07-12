@@ -1,0 +1,153 @@
+- name: Map architecture to TiUP format
+  set_fact:
+    tiup_arch: "{{ 'arm64' if ansible_architecture in ['arm64', 'aarch64'] else 'amd64' }}"
+
+- name: Create TiUP bin directory
+  file:
+    path: "{{ bin_dir }}"
+    state: directory
+    owner: "{{ tiup_user }}"
+    group: "{{ tiup_user }}"
+    mode: '0755'
+
+- name: Check if TiUP is already installed
+  stat:
+    path: "{{ bin_dir }}/tiup"
+  register: tiup_binary
+
+- name: Download TiUP binary
+  get_url:
+    url: "{{ tiup_mirror }}/tiup-linux-{{ tiup_arch }}.tar.gz?{{ ansible_date_time.epoch }}"
+    dest: "/tmp/tiup-linux-{{ tiup_arch }}.tar.gz"
+    mode: '0644'
+  when: not tiup_binary.stat.exists
+  register: tiup_download
+
+- name: Extract TiUP binary
+  unarchive:
+    src: "/tmp/tiup-linux-{{ tiup_arch }}.tar.gz"
+    dest: "{{ bin_dir }}"
+    owner: "{{ tiup_user }}"
+    group: "{{ tiup_user }}"
+    creates: "{{ bin_dir }}/tiup"
+    remote_src: yes
+  when: not tiup_binary.stat.exists
+
+- name: Remove TiUP tarball
+  file:
+    path: "/tmp/tiup-linux-{{ tiup_arch }}.tar.gz"
+    state: absent
+  when: tiup_download.changed
+
+- name: Set TiUP binary permissions
+  file:
+    path: "{{ bin_dir }}/tiup"
+    mode: '0755'
+    owner: "{{ tiup_user }}"
+    group: "{{ tiup_user }}"
+
+- name: Ensure Ansible temp directory exists with proper permissions
+  file:
+    path: /tmp/ansible
+    state: directory
+    mode: '0777'
+  become: true
+  register: ansible_temp_dir
+
+- name: Check current TiUP mirror
+  command: "{{ bin_dir }}/tiup mirror show"
+  become: true
+  become_user: "{{ tiup_user }}"
+  register: current_mirror
+  changed_when: false
+  ignore_errors: true
+
+- name: Set TiUP mirror
+  become: true
+  become_user: "{{ tiup_user }}"
+  command: "{{ bin_dir }}/tiup mirror set {{ tiup_mirror }}"
+  when: current_mirror.stdout is not defined or tiup_mirror not in current_mirror.stdout
+  changed_when: true
+
+- name: Generate topology.yaml from template
+  template:
+    src: topology.yaml.j2
+    dest: "{{ topo_dir }}/topology.yaml"
+    owner: "{{ tiup_user }}"
+    group: "{{ tiup_user }}"
+    mode: '0644'
+
+- name: Check if cluster already exists
+  command: "{{ bin_dir }}/tiup cluster display {{ cluster_name }}"
+  become: true
+  become_user: "{{ tiup_user }}"
+  register: cluster_status
+  changed_when: false
+  failed_when: false
+
+- name: Check if SSH key exists
+  stat:
+    path: "{{ ssh_key_path }}"
+  register: ssh_key
+  become: true
+  become_user: "{{ tiup_user }}"
+
+- name: Generate SSH key
+  command: >
+    ssh-keygen -t rsa 
+    -b 4096 
+    -f {{ ssh_key_path }}
+    -N ''
+    -C "{{ tiup_user }}@{{ inventory_hostname }}"
+  become: true
+  become_user: "{{ tiup_user }}"
+  when: not ssh_key.stat.exists
+  register: ssh_key_generated
+
+- name: Read public key content
+  command: "cat {{ ssh_key_path }}.pub"
+  register: pubkey_content
+  become: true
+  become_user: "{{ tiup_user }}"
+  changed_when: false
+  when: ssh_key.stat.exists or ssh_key_generated.changed
+
+- name: Ensure .ssh directory exists
+  file:
+    path: "/home/{{ tiup_user }}/.ssh"
+    state: directory
+    mode: '0700'
+    owner: "{{ tiup_user }}"
+    group: "{{ tiup_user }}"
+  become: true
+
+- name: Update authorized_keys
+  authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: "{{ pubkey_content.stdout }}"
+  become: true
+  when: pubkey_content.stdout is defined
+
+- name: Deploy TiDB cluster
+  command: >
+    {{ bin_dir }}/tiup cluster deploy 
+    {{ cluster_name }} {{ tidb_version }}
+    {{ topo_dir }}/topology.yaml
+    --user {{ ansible_user }}
+    -i {{ ssh_key_path }}
+    -y
+  become: true
+  become_user: "{{ tiup_user }}"
+  when: cluster_status.rc != 0
+  register: deploy_result
+  changed_when: deploy_result.rc == 0
+
+- name: Revert Ansible temp directory permissions
+  file:
+    path: /tmp/ansible
+    mode: '0755'
+    state: directory
+  become: true
+  when: ansible_temp_dir.changed
+  ignore_errors: true

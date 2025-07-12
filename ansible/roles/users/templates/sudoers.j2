@@ -1,0 +1,8 @@
+# {{ ansible_managed }}
+# Sudo configuration for {{ item.name }}
+
+{% if item.sudo is string %}
+{{ item.name }} ALL=(ALL) {{ item.sudo }}
+{% elif item.sudo is mapping %}
+{{ item.name }} {{ item.sudo.hosts | default('ALL') }}=({{ item.sudo.users | default('ALL') }}) {{ item.sudo.commands | default('ALL') }}
+{% endif %}

@@ -1,0 +1,11 @@
+role_users:
+  database:
+    - name: tidb
+      uid: 2004
+      groups: ['tidb']
+      ssh_keys: []
+
+role_groups:
+  database:
+    - name: tidb
+      gid: 2004

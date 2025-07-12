@@ -1,0 +1,88 @@
+---
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop: "{{ ipvs_required_packages }}"
+
+- name: Load required kernel modules
+  modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - ip_vs
+    - ip_vs_rr
+    - ip_vs_wrr
+    - ip_vs_sh
+    - nf_conntrack
+
+- name: Create IPVS configuration directory
+  file:
+    path: "{{ ipvs_config_dir }}"
+    state: directory
+    mode: '0755'
+
+- name: Configure keepalived for IPVS
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0644'
+  notify: restart keepalived
+
+- name: Configure IPVS services
+  template:
+    src: ipvs-services.sh.j2
+    dest: "{{ ipvs_config_dir }}/ipvs-services.sh"
+    mode: '0755'
+  notify: reload ipvs services
+
+- name: Get IPVS service ports
+  command: ipvsadm -Ln
+  register: ipvs_output
+
+- name: Extract ports from IPVS output
+  set_fact:
+    ipvs_ports: "{{ ipvs_output.stdout_lines | select('search', 'TCP') | map('regex_search', ':[0-9]+') | map('regex_replace', ':', '') | list }}"
+
+- name: Update IPVS services like scale in/out
+  template:
+    src: update-ipvs.sh.j2
+    dest: "{{ ipvs_config_dir }}/ipvs-scaling.sh"
+    mode: '0755'
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    state: present
+    reload: yes
+
+- name: Configure IPVS sysctl parameters
+  sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    state: present
+    reload: yes
+  loop: "{{ ipvs_sysctl_params }}"
+
+- name: Start and enable keepalived
+  systemd:
+    name: keepalived
+    state: started
+    enabled: yes
+
+- name: Create IPVS scaling service file
+  template:
+    src: ipvs-scaling.service.j2
+    dest: /etc/systemd/system/ipvs-scaling.service
+    mode: '0644'
+  notify: reload systemd
+
+- name: Enable and start IPVS scaling service
+  systemd:
+    name: ipvs-scaling.service
+    state: stopped
+    enabled: yes
+

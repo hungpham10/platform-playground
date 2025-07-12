@@ -1,0 +1,30 @@
+---
+- name: Configure timesyncd server
+  hosts: all
+  vars:
+    ntp_defaults:
+      mode: server
+      upstream_servers:
+        - "0.pool.ntp.org"
+        - "1.pool.ntp.org"
+      use_gateway_server: false
+    instance_role: gateway
+
+  roles:
+    - role: ntp
+
+- name: Verify timesyncd configuration
+  hosts: all
+  tasks:
+    - name: Get timesyncd status
+      command: timedatectl status
+      register: timedatectl_status
+      changed_when: false
+
+    - name: Verify timesyncd is active
+      assert:
+        that:
+          - "'System clock synchronized: yes' in timedatectl_status.stdout"
+          - "'NTP service: active' in timedatectl_status.stdout"
+        fail_msg: "timesyncd is not properly configured"
+        success_msg: "timesyncd is configured and running"

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+if [[ $IFACE == "{{ default_inet_name }}" && $AdministrativeState == "configured" ]]; then
+  # @TODO: configure vxlan
+  ip link del vxlan0
+fi

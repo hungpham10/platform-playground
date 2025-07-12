@@ -1,0 +1,73 @@
+---
+- name: Verify system requirements
+  assert:
+    that:
+      - ansible_memtotal_mb >= 2048
+      - ansible_processor_vcpus >= 2
+    fail_msg: "Host does not meet minimum requirements"
+
+- name: Download etcd binary
+  get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v{{ etcd_version }}/etcd-v{{ etcd_version }}-linux-amd64.tar.gz"
+    dest: "/tmp/etcd-v{{ etcd_version }}.tar.gz"
+    checksum: "{{ etcd_checksum }}"
+    mode: '0644'
+
+- name: Create etcd directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: etcd
+    group: etcd
+    mode: '0755'
+  loop:
+    - "{{ etcd_data_dir }}"
+    - "{{ etcd_conf_dir }}"
+    - /usr/local/bin
+
+- name: Extract etcd binary
+  unarchive:
+    src: "/tmp/etcd-v{{ etcd_version }}.tar.gz"
+    dest: /tmp
+    remote_src: yes
+
+- name: Install etcd binaries
+  copy:
+    src: "/tmp/etcd-v{{ etcd_version }}-linux-amd64/{{ item }}"
+    dest: /usr/local/bin/
+    mode: '0755'
+    remote_src: yes
+  loop:
+    - etcd
+    - etcdctl
+
+- name: Configure etcd service
+  template:
+    src: etcd.service.j2
+    dest: /etc/systemd/system/etcd.service
+    mode: '0644'
+  notify: restart etcd
+
+- name: Configure etcd
+  template:
+    src: etcd.conf.yml.j2
+    dest: "{{ etcd_conf_dir }}/etcd.conf.yml"
+    mode: '0644'
+  notify: restart etcd
+
+- name: Start and enable etcd service
+  systemd:
+    name: etcd
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Wait for etcd to be ready
+  wait_for:
+    host: "{{ etcd_listen_client_urls | urlsplit('hostname') }}"
+    port: "{{ etcd_listen_client_urls | urlsplit('port') }}"
+    timeout: 30
+
+- name: Configure backup system
+  include_tasks: backup.yml
+  when: etcd_enable_backup | default(true)

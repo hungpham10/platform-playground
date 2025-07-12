@@ -1,0 +1,28 @@
+## First rule - delete all
+-D
+
+## Increase the buffers to survive stress events
+-b 8192
+
+## Failure Mode
+-f 2
+
+## Audit the audit logs
+-w /var/log/audit/ -k auditlog
+
+## Auditd configuration
+-w /etc/audit/ -p wa -k auditconfig
+-w /etc/libaudit.conf -p wa -k auditconfig
+-w /etc/audisp/ -p wa -k audispconfig
+
+## Monitor for use of audit management tools
+-w /sbin/auditctl -p x -k audittools
+-w /sbin/auditd -p x -k audittools
+
+## Monitor PAM and authentication configuration
+-w /etc/pam.d/ -p wa -k pam
+-w /etc/nsswitch.conf -p wa -k nsswitch
+
+## Monitor system administration actions
+-w /etc/sudoers -p wa -k sudoers
+-w /etc/sudoers.d/ -p wa -k sudoers

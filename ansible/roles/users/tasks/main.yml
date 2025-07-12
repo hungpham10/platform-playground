@@ -1,0 +1,81 @@
+---
+- name: Create groups
+  group:
+    name: "{{ item.name }}"
+    gid: "{{ item.gid | default(omit) }}"
+    state: "{{ item.state | default('present') }}"
+    system: "{{ item.system | default(false) }}"
+  loop: "{{ linux_groups | default([]) }}"
+  when: linux_groups is defined
+
+- name: Get existing UIDs
+  getent:
+    database: passwd
+  register: existing_users
+
+- name: Verify UID uniqueness
+  assert:
+    that:
+      - "item.uid is not defined or 
+         item.uid not in (existing_users.ansible_facts.getent_passwd | dict2items | map(attribute='value') | map('first') | list)"
+    fail_msg: "UID {{ item.uid }} is already in use"
+  loop: "{{ linux_users | default([]) }}"
+  when: 
+    - linux_users is defined
+    - item.uid is defined
+
+- name: Create users
+  user:
+    name: "{{ item.name }}"
+    uid: "{{ item.uid | default(omit) }}"
+    group: "{{ item.group | default(omit) }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: "{{ item.append | default(true) }}"
+    password: "{{ item.password | default(omit) | password_hash('sha512', user_password_salt) }}"
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    home: "{{ item.home | default('/home/' + item.name) }}"
+    create_home: "{{ item.create_home | default(true) }}"
+    system: "{{ item.system | default(false) }}"
+    state: "{{ item.state | default('present') }}"
+    update_password: "{{ item.update_password | default('on_create') }}"
+  loop: "{{ linux_users | default([]) }}"
+  when: linux_users is defined
+
+- name: Set up SSH authorized keys
+  authorized_key:
+    user: "{{ item.0.name }}"
+    key: "{{ item.1 }}"
+    state: present
+  loop: "{{ linux_users | default([]) | selectattr('ssh_keys', 'defined') | subelements('ssh_keys') }}"
+  when: linux_users is defined
+
+- name: Configure sudo access
+  template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ item.name }}"
+    mode: '0440'
+    validate: '/usr/sbin/visudo -cf %s'
+  loop: "{{ linux_users | default([]) | selectattr('sudo', 'defined') | list }}"
+  when: linux_users is defined
+
+- name: Configure password aging
+  command: >
+    chage
+    -M {{ user_password_policies.max_days }}
+    -m {{ user_password_policies.min_days }}
+    -W {{ user_password_policies.warn_days }}
+    -I {{ user_password_policies.inactive_days }}
+    {{ item.name }}
+  loop: >-
+    {{ 
+      linux_users | default([]) | 
+      selectattr('state', 'undefined') | 
+      map('combine', {'state': 'present'}) | 
+      union(linux_users | default([]) | selectattr('state', 'defined')) |
+      selectattr('state', 'equalto', 'present') | 
+      list 
+    }}
+  when: 
+    - linux_users is defined
+    - user_password_policies is defined
+  changed_when: false

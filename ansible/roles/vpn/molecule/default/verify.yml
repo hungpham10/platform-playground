@@ -1,0 +1,142 @@
+---
+- name: Verify VPN Server
+  hosts: vpn-server
+  tasks:
+    - name: Check WireGuard installation
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify WireGuard installation
+      assert:
+        that:
+          - "'wireguard' in ansible_facts.packages"
+        fail_msg: "WireGuard is not installed"
+        success_msg: "WireGuard is installed correctly"
+
+    - name: Check interface configuration
+      stat:
+        path: /etc/wireguard/wg0.conf
+      register: wg_conf
+
+    - name: Verify interface configuration exists
+      assert:
+        that:
+          - wg_conf.stat.exists
+          - wg_conf.stat.mode == '0600'
+        fail_msg: "WireGuard configuration is missing or has wrong permissions"
+
+    - name: Check WireGuard service
+      service_facts:
+
+    - name: Verify WireGuard service is running
+      assert:
+        that:
+          - "'wg-quick@wg0.service' in ansible_facts.services"
+        fail_msg: "WireGuard service is not running"
+
+- name: Verify VPN Server Routing
+  hosts: vpn-server
+  tasks:
+    - name: Check IP forwarding
+      command: sysctl net.ipv4.ip_forward
+      register: ip_forward
+      changed_when: false
+
+    - name: Verify IP forwarding is enabled
+      assert:
+        that:
+          - "'net.ipv4.ip_forward = 1' in ip_forward.stdout"
+        fail_msg: "IP forwarding is not enabled"
+        success_msg: "IP forwarding is enabled"
+
+    - name: Check routes
+      command: ip route
+      register: routes
+      changed_when: false
+
+    - name: Verify routes are configured
+      assert:
+        that:
+          - "'192.168.1.0/24' in routes.stdout"
+          - "'172.16.0.0/16' in routes.stdout"
+        fail_msg: "Required routes are not configured"
+        success_msg: "Routes are configured correctly"
+
+    - name: Check iptables rules
+      command: iptables -L FORWARD
+      register: iptables
+      changed_when: false
+
+    - name: Verify iptables forwarding rules
+      assert:
+        that:
+          - "'ACCEPT' in iptables.stdout"
+        fail_msg: "IPTables forwarding rules are not configured"
+        success_msg: "IPTables forwarding rules are configured correctly"
+
+- name: Verify VPN Client
+  hosts: vpn-client
+  tasks:
+    - name: Check WireGuard installation
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify WireGuard installation
+      assert:
+        that:
+          - "'wireguard' in ansible_facts.packages"
+        fail_msg: "WireGuard is not installed"
+
+    - name: Check interface configuration
+      stat:
+        path: /etc/wireguard/wg0.conf
+      register: wg_conf
+
+    - name: Verify interface configuration exists
+      assert:
+        that:
+          - wg_conf.stat.exists
+          - wg_conf.stat.mode == '0600'
+        fail_msg: "WireGuard configuration is missing or has wrong permissions"
+
+- name: Verify VPN Client Routing
+  hosts: vpn-client
+  tasks:
+    - name: Check routing tables
+      command: ip rule show
+      register: ip_rules
+      changed_when: false
+
+    - name: Verify source-based routing rules
+      assert:
+        that:
+          - "'lookup 200' in ip_rules.stdout"
+        fail_msg: "Source-based routing rules not configured"
+        success_msg: "Source-based routing rules configured correctly"
+
+    - name: Check WireGuard routing table
+      command: ip route show table 200
+      register: wg_routes
+      changed_when: false
+
+    - name: Verify WireGuard routes
+      assert:
+        that:
+          - "'default via' in wg_routes.stdout"
+        fail_msg: "WireGuard routing table not configured"
+        success_msg: "WireGuard routing table configured correctly"
+
+    - name: Check forwarding settings
+      command: sysctl -a
+      register: sysctl_output
+      changed_when: false
+
+    - name: Verify IP forwarding for interfaces
+      assert:
+        that:
+          - "'net.ipv4.conf.eth0.forwarding = 1' in sysctl_output.stdout"
+          - "'net.ipv4.conf.eth1.forwarding = 1' in sysctl_output.stdout"
+        fail_msg: "IP forwarding not enabled for all interfaces"
+        success_msg: "IP forwarding enabled for all interfaces"

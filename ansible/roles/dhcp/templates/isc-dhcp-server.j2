@@ -1,0 +1,3 @@
+# Defaults for isc-dhcp-server (sourced by /etc/init.d/isc-dhcp-server)
+INTERFACESv4="{{ dhcp_defaults.interfaces | map(attribute='name') | join(' ') }}"
+INTERFACESv6=""

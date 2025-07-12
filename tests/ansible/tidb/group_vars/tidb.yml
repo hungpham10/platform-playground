@@ -1,0 +1,34 @@
+---
+# Cluster Settings
+cluster_name: "tidb-cluster"
+cluster_owner: "devops"
+
+# Component Ports
+tidb_port: 4000
+tikv_port: 20160
+pd_port: 2379
+tidb_status_port: 10080
+
+# TiDB Settings
+tidb_log_level: "info"
+tidb_log_format: "text"
+tidb_slow_threshold: 300
+
+# Storage Paths
+data_dir: "/var/lib/tidb"
+log_dir: "/var/log/tidb"
+
+# PD Configuration
+pd_client_urls: "http://0.0.0.0:2379"
+pd_peer_urls: "http://0.0.0.0:2380"
+pd_initial_cluster: "{{ inventory_hostname }}=http://{{ ansible_default_ipv4.address }}:2380"
+
+# TiKV Configuration
+tikv_addr: "0.0.0.0:20160"
+tikv_advertise_addr: "{{ ansible_default_ipv4.address }}:20160"
+tikv_pd_endpoints: ["127.0.0.1:2379"]
+
+# Monitoring
+enable_monitoring: true
+prometheus_port: 9090
+grafana_port: 3000

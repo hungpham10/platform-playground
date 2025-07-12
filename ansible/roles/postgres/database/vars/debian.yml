@@ -1,0 +1,8 @@
+---
+postgres_repo_path: /etc/apt/sources.list.d/pgdg.list
+postgres_packages:
+  - postgresql-{{ postgres_version }}
+  - postgresql-contrib
+  - python3-psycopg2
+postgres_service: postgresql
+postgres_initdb_cmd: pg_createcluster {{ postgres_version }} main

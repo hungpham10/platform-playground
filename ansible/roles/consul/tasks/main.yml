@@ -1,0 +1,46 @@
+---
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop: "{{ consul_required_packages }}"
+
+- name: Install Consul packages
+  package:
+    name: "{{ consul_required_packages }}"
+    state: present
+
+- name: Create Consul directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0750'
+  loop:
+    - "{{ consul_config_dir }}"
+    - "{{ consul_data_dir }}"
+
+- name: Configure Consul
+  template:
+    src: consul.hcl.j2
+    dest: "{{ consul_config_dir }}/consul.hcl"
+    owner: consul
+    group: consul
+    mode: '0640'
+  notify: restart consul
+
+- name: Configure systemd service
+  template:
+    src: consul.service.j2
+    dest: /etc/systemd/system/consul.service
+    mode: '0644'
+  notify: restart consul
+
+- name: Enable and start Consul service
+  systemd:
+    name: consul
+    state: started
+    enabled: yes

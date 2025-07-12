@@ -1,0 +1,52 @@
+#!/bin/bash
+set -eo pipefail
+
+DRBD_RES="$1"
+
+log() {
+    logger -t drbd-split-brain-recover "$*"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+}
+
+show_status() {
+    echo "Local node status:"
+    drbdadm status $DRBD_RES
+    
+    echo "Local generation info:"
+    drbdadm get-gi $DRBD_RES
+    
+    echo "Peer generation info:"
+    drbdadm show-gi $DRBD_RES
+}
+
+manual_recover() {
+    local choice
+    
+    show_status
+    
+    echo "Choose recovery action:"
+    echo "1) Discard local changes"
+    echo "2) Discard peer changes"
+    echo "3) Disconnect resource"
+    read -p "Enter choice (1-3): " choice
+    
+    case "$choice" in
+        1)
+            drbdadm secondary $DRBD_RES
+            drbdadm connect --discard-my-data $DRBD_RES
+            ;;
+        2)
+            drbdadm primary $DRBD_RES
+            drbdadm connect $DRBD_RES
+            ;;
+        3)
+            drbdadm disconnect $DRBD_RES
+            ;;
+        *)
+            echo "Invalid choice"
+            exit 1
+            ;;
+    esac
+}
+
+manual_recover

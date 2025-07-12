@@ -1,0 +1,6 @@
+molecule>=3.4.0
+pytest>=6.2.5
+netaddr
+pytest-testinfra>=6.4.0
+ansible-lint>=5.0.0
+yamllint>=1.26.0

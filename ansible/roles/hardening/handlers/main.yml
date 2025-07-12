@@ -1,0 +1,21 @@
+---
+- name: reload pam
+  command: pam-auth-update --package
+
+- name: restart sshd
+  systemd:
+    name: ssh
+    state: restarted
+
+- name: restart auditd
+  systemd:
+    name: auditd
+    state: restarted
+
+- name: initialize aide database
+  command: aide --init
+  when: not aide_db_file.stat.exists
+
+- name: copy aide database
+  command: cp /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  when: aide_init.changed

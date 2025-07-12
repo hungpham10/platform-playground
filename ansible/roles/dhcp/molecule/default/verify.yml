@@ -1,0 +1,64 @@
+---
+- name: Verify DHCP Server
+  hosts: dhcp-server
+  tasks:
+    - name: Check if DHCP server is installed
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify DHCP server installation
+      assert:
+        that:
+          - "'isc-dhcp-server' in ansible_facts.packages"
+        fail_msg: "DHCP server is not installed"
+        success_msg: "DHCP server is installed correctly"
+
+    - name: Check DHCP configuration
+      stat:
+        path: /etc/dhcp/dhcpd.conf
+      register: dhcp_conf
+
+    - name: Verify DHCP configuration exists
+      assert:
+        that:
+          - dhcp_conf.stat.exists
+        fail_msg: "DHCP configuration file missing"
+        success_msg: "DHCP configuration file exists"
+
+    - name: Get DHCP service status
+      service_facts:
+
+    - name: Verify DHCP service is running
+      assert:
+        that:
+          - "ansible_facts.services['isc-dhcp-server.service'].state == 'running'"
+        fail_msg: "DHCP service is not running"
+        success_msg: "DHCP service is running"
+
+- name: Verify DHCP Client
+  hosts: dhcp-client
+  tasks:
+    - name: Check if DHCP client is installed
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify DHCP client installation
+      assert:
+        that:
+          - "'isc-dhcp-client' in ansible_facts.packages"
+        fail_msg: "DHCP client is not installed"
+        success_msg: "DHCP client is installed correctly"
+
+    - name: Check client configuration
+      stat:
+        path: /etc/dhcp/dhclient.conf
+      register: client_conf
+
+    - name: Verify client configuration exists
+      assert:
+        that:
+          - client_conf.stat.exists
+        fail_msg: "DHCP client configuration file missing"
+        success_msg: "DHCP client configuration file exists"

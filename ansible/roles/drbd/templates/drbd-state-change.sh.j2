@@ -1,0 +1,178 @@
+#!/bin/bash
+set -eo pipefail
+
+# DRBD handler script
+# Arguments from handlers.d:
+# %R = Resource name
+# %P = Previous role (Primary/Secondary)
+# %S = Current state
+# %N = Peer node name
+# %NS = Peer node state
+
+DRBD_RES="$1"
+DRBD_ROLE="$2"
+DRBD_STATE="$3"
+DRBD_PEER="$4"
+DRBD_PEER_STATE="$5"
+
+# Configure logging
+log() {
+    logger -t drbd-state-change "$*"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+}
+
+check_peer_status() {
+    drbdadm status "$DRBD_RES" | grep -oP 'peer-node:[^\s]+'
+}
+
+handle_split_brain() {
+    local res="$1"
+    log "Split-brain detected on resource $res"
+
+    # Notify administrators
+    echo "Split-brain detected on DRBD resource $res at $(date)" | \
+        mail -s "DRBD Split-brain Alert" {{ drbd_notify_email }}
+
+    {% if drbd_automatic_recovery %}
+    log "Attempting automatic split-brain recovery"
+    
+    case "{{ drbd_split_brain_handler }}" in
+        "disconnect")
+            log "Disconnecting resource"
+            drbdadm disconnect $res
+            ;;
+            
+        "discard-younger-primary")
+            log "Checking creation times"
+            local my_gen=$(drbdadm get-gi $res | grep -oP 'creation\stime\s\K[0-9]+')
+            local peer_gen=$(drbdadm show-gi $res | grep -oP 'creation\stime\s\K[0-9]+')
+            
+            if [ "$my_gen" -gt "$peer_gen" ]; then
+                log "Local data is newer, becoming primary"
+                drbdadm primary $res
+            else
+                log "Peer data is newer, becoming secondary"
+                drbdadm secondary $res
+            fi
+            ;;
+            
+        "discard-least-changes")
+            log "Checking data changes"
+            local my_changes=$(drbdadm get-gi $res | grep -oP 'updates\K[0-9]+')
+            local peer_changes=$(drbdadm show-gi $res | grep -oP 'updates\K[0-9]+')
+            
+            if [ "$my_changes" -gt "$peer_changes" ]; then
+                log "Local node has more changes, becoming primary"
+                drbdadm primary $res
+            else
+                log "Peer has more changes, becoming secondary"
+                drbdadm secondary $res
+            fi
+            ;;
+    esac
+
+    # Wait for recovery
+    local timeout={{ drbd_split_brain_recovery_timeout }}
+    while [ $timeout -gt 0 ]; do
+        if drbdadm status $res | grep -q "UpToDate/UpToDate"; then
+            log "Split-brain recovery successful"
+            return 0
+        fi
+        sleep 1
+        timeout=$((timeout - 1))
+    done
+
+    log "Split-brain recovery failed after timeout"
+    return 1
+    {% else %}
+    log "Automatic recovery disabled, manual intervention required"
+    return 1
+    {% endif %}
+}
+
+handle_primary() {
+    log "Handling primary transition for $DRBD_RES"
+
+    {% if drbd_mount_point is defined %}
+    # Mount filesystem if not already mounted
+    if ! mountpoint -q {{ drbd_mount_point }}; then
+        log "Mounting /dev/drbd$DRBD_RES on {{ drbd_mount_point }}"
+        mount "/dev/drbd$DRBD_RES" "{{ drbd_mount_point }}"
+    fi
+    {% endif %}
+
+    {% if drbd_managed_services is defined %}
+    # Start managed services
+    {% for service in drbd_managed_services %}
+    log "Starting service: {{ service }}"
+    systemctl start {{ service }}
+    {% endfor %}
+    {% endif %}
+}
+
+handle_secondary() {
+    log "Handling secondary transition for $DRBD_RES"
+
+    {% if drbd_managed_services is defined %}
+    # Stop managed services
+    {% for service in drbd_managed_services %}
+    log "Stopping service: {{ service }}"
+    systemctl stop {{ service }}
+    {% endfor %}
+    {% endif %}
+
+    {% if drbd_mount_point is defined %}
+    # Unmount filesystem if mounted
+    if mountpoint -q {{ drbd_mount_point }}; then
+        log "Unmounting {{ drbd_mount_point }}"
+        fuser -km {{ drbd_mount_point }} || true
+        umount {{ drbd_mount_point }}
+    fi
+    {% endif %}
+}
+
+promote_to_primary() {
+    log "Attempting promotion to primary for $DRBD_RES"
+    
+    # Wait for potential recovery
+    sleep {{ drbd_promotion_delay | default(30) }}
+    
+    # Check peer status
+    local peer_status
+    peer_status=$(check_peer_status)
+    
+    if [[ "$peer_status" == *"PeerDisconnected"* ]]; then
+        log "Peer is disconnected, promoting to primary"
+        if drbdadm primary "$DRBD_RES"; then
+            handle_primary
+            return 0
+        fi
+    fi
+    
+    return 1
+}
+
+main() {
+    log "State change: Resource=$DRBD_RES Role=$DRBD_ROLE State=$DRBD_STATE Peer=$DRBD_PEER PeerState=$DRBD_PEER_STATE"
+    
+    case "$DRBD_ROLE" in
+        Primary)
+            handle_primary
+            ;;
+        Secondary)
+            handle_secondary
+            if [[ "$DRBD_PEER_STATE" == "Disconnected" ]]; then
+                promote_to_primary
+            fi
+            ;;
+        "split-brain")
+            handle_split_brain "$DRBD_RES"
+            ;;
+        *)
+            log "Unknown role: $DRBD_ROLE"
+            exit 1
+            ;;
+    esac
+}
+
+main

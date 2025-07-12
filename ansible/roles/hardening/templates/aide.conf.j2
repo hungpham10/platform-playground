@@ -1,0 +1,66 @@
+# AIDE configuration file
+
+# The default database
+database=file:/var/lib/aide/aide.db
+database_out=file:/var/lib/aide/aide.db.new
+
+# Number of CPUs to use during file checksum calculations
+gzip_dbout=yes
+verbose=5
+
+# Rules
+OwnerMode = p+u+g
+Size = s
+Growing = p+u+g+i+n+S
+Changes = p+u+g+i+n+S+acl+xattrs
+Full = p+u+g+i+n+S+acl+xattrs+sha256
+
+# Monitored directories
+/boot       Full
+/bin        Full
+/sbin       Full
+/lib        Full
+/lib64      Full
+/opt        Full
+/usr        Full
+/root       Full
+
+# System configuration
+/etc        Full
+/etc/cron.d Full
+/etc/cron.daily Full
+/etc/cron.hourly Full
+/etc/cron.weekly Full
+/etc/cron.monthly Full
+
+# Security configuration
+/etc/pam.d              Full
+/etc/security           Full
+/etc/ssh                Full
+/etc/sudoers            Full
+/etc/sudoers.d          Full
+/etc/audit              Full
+/etc/logrotate.d        Full
+/etc/profile.d          Full
+
+# Log files
+/var/log                Growing
+/var/log/audit          Growing
+/var/log/auth.log       Growing
+/var/log/daemon.log     Growing
+/var/log/kern.log       Growing
+/var/log/syslog         Growing
+
+# Ignore temporary files and directories
+!/tmp
+!/var/tmp
+!/var/run
+!/var/lock
+!/var/spool
+!/var/cache
+!/proc
+!/sys
+!/dev
+!/run
+!/media
+!/mnt

@@ -1,0 +1,60 @@
+---
+- name: Hostname | Check if /etc/hosts exists
+  stat:
+    path: /etc/hosts
+  register: hosts_file
+
+- name: Hostname | Create /etc/hosts if not exists
+  copy:
+    content: "127.0.0.1 localhost\n"
+    dest: /etc/hosts
+    mode: '0644'
+  when: not hosts_file.stat.exists
+
+- name: Hostname | Generate expected hosts content
+  set_fact:
+    expected_hosts_content: |
+      {% for item in nodes | default([]) %}
+      {{ item['ip'] }} {{ item['hostname'] }}.{{ domain }} {{ item['hostname'] }}.{{ net }}.{{ domain }} {{ item['hostname'] }}
+      {% endfor %}
+
+- name: Hostname | Get current hosts block content
+  command: sed -n '/# BEGIN ANSIBLE MANAGED BLOCK FOR HOSTNAME/,/# END ANSIBLE MANAGED BLOCK FOR HOSTNAME/p' /etc/hosts
+  register: current_hosts_block
+  changed_when: false
+  failed_when: false
+
+- name: Hostname | Update hostname of cluster to /etc/hosts
+  blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} ANSIBLE MANAGED BLOCK FOR HOSTNAME"
+    block: "{{ expected_hosts_content }}"
+    state: present
+  when: current_hosts_block.stdout | replace('\n', '') != expected_hosts_content | replace('\n', '')
+
+- name: Hostname | Change hostname in /etc/hostname
+  lineinfile:
+    path: /etc/hostname
+    regexp: '^.*$'
+    line: "{{ inventory_hostname }}"
+
+- name: Hostname | Get current hostname
+  command: hostname
+  register: current_hostname
+  changed_when: false
+
+- name: Hostname | Update new hostname
+  ansible.posix.sysctl:
+    name: kernel.hostname
+    value: "{{ inventory_hostname }}"
+    sysctl_set: yes
+  register: hostname_update
+
+- name: Hostname | Restart rsyslog if hostname changed
+  systemd:
+    name: rsyslog
+    state: restarted
+  when: 
+    - current_hostname.stdout != inventory_hostname
+    - hostname_update.changed
+  ignore_errors: true

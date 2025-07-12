@@ -1,0 +1,13 @@
+---
+tftp_root: /srv/tftp
+tftp_bind_address: "0.0.0.0:69"
+tftp_verbose: false
+pxe_timeout: 50
+
+# Example boot menu items
+boot_menu_items:
+  - label: ubuntu
+    menu_label: Boot worker
+    kernel: vmlinuz
+    initrd: initrd
+    append: root=/dev/ram0 ramdisk_size=1500000

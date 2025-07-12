@@ -1,0 +1,34 @@
+---
+- name: Verify storage configuration
+  hosts: all
+  tasks:
+    - name: Check if required packages are installed
+      package_facts:
+        manager: apt
+      register: pkg_facts
+
+    - name: Verify storage packages
+      assert:
+        that:
+          - "'lvm2' in ansible_facts.packages"
+          - "'xfsprogs' in ansible_facts.packages"
+          - "'e2fsprogs' in ansible_facts.packages"
+        fail_msg: "Required storage packages are not installed"
+        success_msg: "Storage packages are installed correctly"
+
+    - name: Check mount points
+      stat:
+        path: "{{ item.mount_point }}"
+      register: mount_points
+      loop: "{{ storage_devices + storage_lvs }}"
+      when: item.state == 'present'
+
+    - name: Verify mount points
+      assert:
+        that:
+          - item.stat.exists
+          - item.stat.mode == '0755'
+        fail_msg: "Mount point {{ item.item.mount_point }} is not configured correctly"
+        success_msg: "Mount point {{ item.item.mount_point }} is configured correctly"
+      loop: "{{ mount_points.results }}"
+      when: item is not skipped

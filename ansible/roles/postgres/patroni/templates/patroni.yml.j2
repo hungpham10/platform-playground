@@ -1,0 +1,78 @@
+---
+scope: {{ patroni_cluster_name }}
+namespace: {{ patroni_namespace }}
+name: {{ patroni_name }}
+
+restapi:
+  listen: {{ patroni_restapi_listen }}
+  connect_address: {{ patroni_restapi_connect_address }}
+  authentication:
+    username: {{ patroni_restapi_username }}
+    password: {{ patroni_restapi_password }}
+
+etcd:
+  protocol: {{ patroni_etcd_protocol }}
+  hosts: {{ patroni_etcd_hosts | to_json }}
+  timeout: {{ patroni_etcd_timeout }}
+
+bootstrap:
+  dcs:
+    ttl: {{ patroni_ttl }}
+    loop_wait: {{ patroni_loop_wait }}
+    retry_timeout: {{ patroni_retry_timeout }}
+    maximum_lag_on_failover: {{ patroni_maximum_lag_on_failover }}
+    failsafe_mode: {{ patroni_failsafe_mode | lower }}
+    master_start_timeout: {{ patroni_master_start_timeout }}
+    synchronous_mode: {{ patroni_synchronous_mode | lower }}
+    postgresql:
+      use_pg_rewind: true
+      use_slots: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        wal_keep_segments: 8
+        max_wal_senders: 5
+        max_replication_slots: 5
+        max_connections: 100
+        max_prepared_transactions: 0
+        max_locks_per_transaction: 64
+        max_worker_processes: 8
+        max_parallel_workers: 4
+        wal_log_hints: "on"
+
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+    - locale: en_US.UTF-8
+
+  pg_hba:
+    - host replication {{ patroni_replication_username }} all md5
+    - host all all all md5
+
+postgresql:
+  listen: {{ patroni_postgresql_listen }}
+  connect_address: {{ patroni_postgresql_connect_address }}
+  data_dir: {{ patroni_postgresql_data_dir }}
+  bin_dir: {{ patroni_postgresql_bin_dir }}
+  pgpass: /tmp/pgpass0
+  authentication:
+    replication:
+      username: {{ patroni_replication_username }}
+      password: {{ patroni_replication_password }}
+    superuser:
+      username: postgres
+      password: {{ vault_postgres_password }}
+  parameters:
+    unix_socket_directories: '.'
+    
+tags:
+    nofailover: false
+    noloadbalance: false
+    clonefrom: false
+    nosync: false
+
+callbacks:
+  on_start: /usr/local/bin/patroni-notify.sh on_start
+  on_stop: /usr/local/bin/patroni-notify.sh on_stop
+  on_restart: /usr/local/bin/patroni-notify.sh on_restart
+  on_role_change: /usr/local/bin/patroni-notify.sh on_role_change

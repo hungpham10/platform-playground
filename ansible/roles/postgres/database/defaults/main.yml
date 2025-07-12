@@ -1,0 +1,49 @@
+---
+postgres_version: "15"
+postgres_data_dir: /var/lib/postgresql/{{ postgres_version }}/main
+postgres_config_path: /etc/postgresql/{{ postgres_version }}/main
+postgres_backup_dir: /var/lib/postgresql/backups
+postgres_archive_dir: /var/lib/postgresql/archive
+
+postgres_port: 5432
+postgres_listen_addresses: '*'
+postgres_max_connections: 100
+
+# Memory settings
+postgres_shared_buffers: "{{ (ansible_memtotal_mb * 0.25) | int }}MB"
+postgres_effective_cache_size: "{{ (ansible_memtotal_mb * 0.75) | int }}MB"
+postgres_maintenance_work_mem: "256MB"
+postgres_work_mem: "64MB"
+
+# WAL settings
+postgres_wal_level: replica
+postgres_max_wal_senders: 10
+postgres_max_replication_slots: 10
+postgres_archive_mode: on
+postgres_archive_command: "test ! -f {{ postgres_archive_dir }}/%f && cp %p {{ postgres_archive_dir }}/%f"
+
+# Replication Configuration
+postgres_replication_role: standalone  # Options: master, standby, standalone
+postgres_replication_user: replicator
+postgres_replication_password: "{{ vault_postgres_replication_password }}"
+postgres_wal_keep_segments: 32
+postgres_script_dir: /usr/local/bin
+
+# Example user and database configuration
+postgres_users: []
+  # - name: myapp
+  #   password: "{{ vault_myapp_db_password }}"
+  #   flags: "CREATEDB,NOSUPERUSER"
+
+postgres_databases: []
+  # - name: myapp_production
+  #   owner: myapp
+  #   encoding: UTF-8
+
+# pgBackRest Configuration
+pgbackrest_config_path: /etc/pgbackrest
+pgbackrest_log_path: /var/log/pgbackrest
+pgbackrest_backup_path: /var/lib/pgbackrest
+pgbackrest_script_path: /usr/local/bin
+pgbackrest_stanza_name: main
+pgbackrest_retention_full: 7

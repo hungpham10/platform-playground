@@ -1,0 +1,162 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure PostgreSQL Database Servers
+  hosts: database
+  become: true
+  vars:
+    instance_role: database
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "group_vars/all"
+        - "group_vars/database"
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      tags: ["always"]
+
+  roles:
+    - role: storage
+      vars:
+        storage_devices: "{{ storage_devices | default([]) }}"
+        storage_vgs: "{{ storage_vgs | default([]) }}"
+        storage_lvs: "{{ storage_lvs | default([]) }}"
+      tags: ["storage"]
+
+    # etcd cluster for consensus
+    - role: etcd
+      vars:
+        etcd_cluster_name: "{{ etcd_defaults.cluster_name | default('pgcluster') }}"
+        etcd_initial_cluster_token: "{{ etcd_defaults.initial_token | default('etcd-cluster-1') }}"
+        etcd_listen_peer_urls: "{{ etcd_defaults.listen_peer_urls | default('http://0.0.0.0:2380') }}"
+        etcd_listen_client_urls: "{{ etcd_defaults.listen_client_urls | default('http://0.0.0.0:2379') }}"
+        etcd_initial_advertise_peer_urls: "http://{{ ansible_default_ipv4.address }}:2380"
+        etcd_advertise_client_urls: "http://{{ ansible_default_ipv4.address }}:2379"
+      tags: ["database", "etcd"]
+
+    # Add mail configuration before Patroni and Analysis
+    - role: mail
+      vars:
+        mail_relay_host: "{{ mail_defaults.relay_host | default('') }}"
+      tags: ["system", "mail"]
+
+    # PostgreSQL with Patroni for HA
+    - role: postgres/patroni
+      vars:
+        patroni_cluster_name: "{{ patroni_defaults.cluster_name | default('pgcluster') }}"
+        patroni_scope: "{{ patroni_defaults.scope | default('postgres') }}"
+        patroni_name: "{{ inventory_hostname }}"
+        patroni_etcd_hosts: "{{ groups['database'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', '\\1:2379') | list }}"
+        patroni_postgresql_connect_address: "{{ ansible_default_ipv4.address }}:5432"
+        patroni_restapi_connect_address: "{{ ansible_default_ipv4.address }}:8008"
+        patroni_notify_email: "{{ mail_defaults.dba_email }}"
+        patroni_smtp_server: "localhost"
+      tags: ["database", "postgres", "patroni"]
+
+    # Connection pooling with pgpool
+    - role: postgres/pool
+      vars:
+        pgpool_backend_nodes: >-
+          {{ groups['database'] | map('extract', hostvars) | 
+             map('combine', {'port': 5432, 'weight': 1}) | list }}
+        pgpool_virtual_ip: "{{ pgpool_defaults.virtual_ip | default('') }}"
+        pgpool_delegate_ip: "{{ pgpool_defaults.delegate_ip | default('') }}"
+        pgpool_watchdog: "{{ pgpool_defaults.enable_watchdog | default(true) }}"
+        pgpool_master_slave_mode: "{{ pgpool_defaults.master_slave_mode | default(true) }}"
+      tags: ["database", "postgres", "pool"]
+
+    # Load balancing with IPVS
+    - role: loadbalancer/ipvs
+      vars:
+        ipvs_virtual_services:
+          - name: "postgres-read"
+            virtual_ip: "{{ pgpool_defaults.virtual_ip }}"
+            port: 5432
+            protocol: tcp
+            scheduler: rr
+            real_servers: "{{ groups['database'] | map('extract', hostvars, ['ansible_default_ipv4', 'address']) | map('regex_replace', '^(.*)$', {'address': '\\1', 'port': 5432, 'weight': 1}) | list }}"
+      when: inventory_hostname == groups['database'][0]
+      tags: ["loadbalancer", "ipvs"]
+
+    # PostgreSQL analysis and monitoring
+    - role: postgres/analyse
+      vars:
+        postgres_log_dir: "{{ postgres_defaults.log_dir | default('/var/log/postgresql') }}"
+        postgres_log_format: "{{ postgres_defaults.log_format | default('csv') }}"
+        enable_pg_stat_statements: true
+        enable_auto_explain: true
+        pg_analysis_email_to: "{{ mail_defaults.dba_email }}"
+        pg_analysis_smtp_relay: "localhost"
+      tags: ["database", "postgres", "monitoring"]
+
+    # PostgreSQL analysis and monitoring with PMM
+    - role: pmm
+      vars:
+        pmm_server_address: "{{ monitoring_defaults.pmm_server | default('pmm.example.com:443') }}"
+        pmm_server_username: "{{ monitoring_defaults.pmm_username | default('admin') }}"
+        pmm_server_password: "{{ monitoring_defaults.pmm_password | default(vault_pmm_server_password) }}"
+        pmm_node_name: "{{ inventory_hostname }}"
+        pmm_node_type: postgresql
+        pmm_metrics_mode: auto
+        pmm_metrics_resolution: "{{ monitoring_defaults.metrics_resolution | default('1s') }}"
+        pmm_metrics_retention: "{{ monitoring_defaults.metrics_retention | default('30d') }}"
+        pmm_agent_debug: "{{ monitoring_defaults.enable_debug | default(false) }}"
+      tags: ["monitoring", "pmm"]
+  post_tasks:
+    - name: Verify cluster status
+      block:
+        - name: Check etcd cluster health
+          command: etcdctl cluster-health
+          changed_when: false
+          register: etcd_health
+          failed_when: etcd_health.rc != 0
+
+        - name: Check Patroni cluster status
+          uri:
+            url: "http://{{ ansible_default_ipv4.address }}:8008/cluster"
+            method: GET
+            user: "{{ patroni_restapi_username }}"
+            password: "{{ patroni_restapi_password }}"
+            force_basic_auth: yes
+          register: patroni_status
+
+        - name: Verify pgpool status
+          command: pcp_node_count -h localhost -U postgres -w
+          changed_when: false
+          register: pgpool_status
+          failed_when: pgpool_status.rc != 0
+
+        - name: Check IPVS virtual services
+          command: ipvsadm -Ln
+          changed_when: false
+          register: ipvs_status
+          when: inventory_hostname == groups['database'][0]
+
+        - name: Verify PMM agent status
+          service_facts:
+          register: services
+
+        - name: Check PMM agent running
+          assert:
+            that:
+              - "'pmm-agent.service' in services.ansible_facts.services"
+              - "services.ansible_facts.services['pmm-agent.service'].state == 'running'"
+            fail_msg: "PMM agent is not running"
+            success_msg: "PMM agent is running correctly"
+
+        - name: Check PMM node registration
+          command: pmm-admin list
+          register: pmm_nodes
+          changed_when: false
+          failed_when: false
+      tags: ["verify", "monitoring"]

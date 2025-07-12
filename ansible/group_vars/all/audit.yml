@@ -1,0 +1,42 @@
+---
+# Audit configuration
+audit_rules:
+  # System calls
+  - "-a exit,always -F arch=b64 -S execve -k exec"
+  - "-a exit,always -F arch=b64 -S open,openat -F auid>=1000 -F auid!=4294967295 -k access"
+  - "-a exit,always -F arch=b64 -S chmod,fchmod,chown,fchown -k perm_mod"
+  
+  # User and group modifications
+  - "-w /etc/group -p wa -k identity"
+  - "-w /etc/passwd -p wa -k identity"
+  - "-w /etc/shadow -p wa -k identity"
+  - "-w /etc/sudoers -p wa -k sudo_log"
+  - "-w /etc/sudoers.d/ -p wa -k sudo_log"
+  
+  # Network configuration changes
+  - "-w /etc/hosts -p wa -k network_modifications"
+  - "-w /etc/network/ -p wa -k network_modifications"
+  - "-w /etc/netplan/ -p wa -k network_modifications"
+  
+  # System configuration changes
+  - "-w /etc/systemd/ -p wa -k systemd"
+  - "-w /etc/cron.d/ -p wa -k cron"
+  - "-w /etc/crontab -p wa -k cron"
+  - "-w /var/spool/cron/crontabs/ -p wa -k cron"
+  
+  # Package management
+  - "-w /usr/bin/dpkg -p x -k package_management"
+  - "-w /usr/bin/apt -p x -k package_management"
+  - "-w /usr/bin/apt-get -p x -k package_management"
+  
+  # Log files
+  - "-w /var/log/ -p wa -k log_modifications"
+
+audit_log_path: /var/log/audit/audit.log
+audit_max_log_file: 8
+audit_max_log_file_action: rotate
+audit_num_logs: 5
+audit_space_left: 75
+audit_space_left_action: email
+audit_admin_space_left: 50
+audit_admin_space_left_action: single

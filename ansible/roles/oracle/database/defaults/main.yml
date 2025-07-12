@@ -1,0 +1,25 @@
+---
+oracle_version: "19.3.0"
+oracle_edition: "EE"
+oracle_base: /u01/app/oracle
+oracle_home: /u01/app/oracle/product/19.3.0/dbhome_1
+oracle_inventory: /u01/app/oraInventory
+oracle_sid: ORCLDB
+oracle_charset: AL32UTF8
+oracle_memory_percentage: 40
+oracle_create_database: true
+
+oracle_required_packages:
+  - oracle-database-preinstall-19c
+  - unzip
+  - binutils
+  - compat-libcap1
+  - compat-libstdc++-33
+
+oracle_kernel_params:
+  - { name: "kernel.shmmax", value: "4398046511104" }
+  - { name: "kernel.shmall", value: "1073741824" }
+  - { name: "kernel.shmmni", value: "4096" }
+  - { name: "kernel.sem", value: "250 32000 100 128" }
+  - { name: "fs.file-max", value: "6815744" }
+  - { name: "fs.aio-max-nr", value: "1048576" }

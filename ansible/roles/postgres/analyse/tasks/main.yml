@@ -1,0 +1,76 @@
+---
+- name: Verify required packages
+  assert:
+    that: 
+      - ansible_facts.packages[item] is defined
+    fail_msg: "Required package {{ item }} is not installed"
+    success_msg: "Required package {{ item }} is present"
+  loop:
+    - pgbadger
+    - mailutils
+    - postfix
+
+- name: Create log analysis directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: postgres
+    group: postgres
+    mode: '0750'
+  loop:
+    - "{{ pg_analysis_report_dir }}"
+    - "{{ pg_analysis_report_dir }}/daily"
+    - "{{ pg_analysis_report_dir }}/weekly"
+    - "{{ pg_analysis_report_dir }}/monthly"
+
+- name: Configure log analysis script
+  template:
+    src: analyze-postgres-logs.sh.j2
+    dest: /usr/local/bin/analyze-postgres-logs
+    mode: '0755'
+
+- name: Configure email report script
+  template:
+    src: email-postgres-report.sh.j2
+    dest: /usr/local/bin/email-postgres-report
+    mode: '0755'
+
+- name: Setup daily analysis cron job
+  cron:
+    name: "PostgreSQL Daily Log Analysis"
+    hour: "23"
+    minute: "45"
+    job: "/usr/local/bin/analyze-postgres-logs daily"
+    user: postgres
+
+- name: Setup weekly analysis cron job
+  cron:
+    name: "PostgreSQL Weekly Log Analysis"
+    weekday: "0"
+    hour: "23"
+    minute: "50"
+    job: "/usr/local/bin/analyze-postgres-logs weekly"
+    user: postgres
+
+- name: Setup monthly analysis cron job
+  cron:
+    name: "PostgreSQL Monthly Log Analysis"
+    day: "1"
+    hour: "0"
+    minute: "5"
+    job: "/usr/local/bin/analyze-postgres-logs monthly"
+    user: postgres
+
+- name: Setup email report cron jobs
+  cron:
+    name: "PostgreSQL {{ item }} Email Report"
+    hour: "{{ item == 'daily' and '0' or '1' }}"
+    minute: "{{ item == 'daily' and '0' or '0' }}"
+    weekday: "{{ item == 'weekly' and '1' or '*' }}"
+    day: "{{ item == 'monthly' and '1' or '*' }}"
+    job: "/usr/local/bin/email-postgres-report {{ item }}"
+    user: postgres
+  loop:
+    - daily
+    - weekly
+    - monthly

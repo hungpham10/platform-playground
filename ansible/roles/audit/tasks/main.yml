@@ -1,0 +1,33 @@
+---
+- name: Configure audit rules
+  template:
+    src: audit.rules.j2
+    dest: /etc/audit/rules.d/audit.rules
+    mode: '0600'
+    owner: root
+    group: root
+  notify: restart auditd
+
+- name: Configure auditd
+  template:
+    src: auditd.conf.j2
+    dest: /etc/audit/auditd.conf
+    mode: '0640'
+    owner: root
+    group: root
+  notify: restart auditd
+
+- name: Configure audit logging
+  template:
+    src: rsyslog-audit.conf.j2
+    dest: /etc/rsyslog.d/10-audit.conf
+    mode: '0644'
+    owner: root
+    group: root
+  notify: restart rsyslog
+
+- name: Enable and start audit daemon
+  service:
+    name: auditd
+    state: started
+    enabled: yes

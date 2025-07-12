@@ -1,0 +1,5 @@
+standby_mode = 'on'
+primary_conninfo = 'host={{ groups['postgres_master'][0] }} port=5432 user={{ postgres_replication_user }} password={{ postgres_replication_password }} application_name={{ inventory_hostname }}'
+restore_command = 'cp {{ postgres_archive_dir }}/%f %p'
+recovery_target_timeline = 'latest'
+primary_slot_name = '{{ inventory_hostname }}_slot'

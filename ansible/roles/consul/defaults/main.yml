@@ -1,0 +1,10 @@
+---
+consul_required_packages:
+  - consul
+  - unzip
+
+consul_config_dir: /etc/consul.d
+consul_data_dir: /var/lib/consul
+
+consul_is_server: true
+consul_bootstrap_expect: 1

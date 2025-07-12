@@ -1,0 +1,29 @@
+---
+- name: Configure logrotate global settings
+  template:
+    src: "logrotate.conf.j2"
+    dest: "/etc/logrotate.conf"
+    mode: "0644"
+    owner: root
+    group: root
+  notify: Restart logrotate
+
+- name: Generate logrotate.d files
+  template:
+    src: log-entry.conf.j2
+    dest: "/etc/logrotate.d/{{ entry.name }}"
+    mode: "0644"
+    owner: root
+    group: root
+  vars:
+    config: "{{ entry }}"
+  loop: "{{ logrotate_entries }}"
+  loop_control:
+    loop_var: entry
+  notify: Restart logrotate
+
+- name: Verify logrotate configuration
+  command: logrotate -d /etc/logrotate.conf
+  changed_when: false
+  register: logrotate_verify
+  failed_when: logrotate_verify.rc != 0

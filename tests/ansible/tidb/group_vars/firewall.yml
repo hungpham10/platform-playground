@@ -1,0 +1,18 @@
+---
+firewall_rules:
+  tcp_ports:
+    - port: 4000
+      comment: "tidb mysql"
+    - port: 2379   
+      comment: "pd client"
+    - port: 2380   
+      comment: "pd peer"
+    - port: 20160  
+      comment: "tikv communication"
+    - port: 20180
+      comment: "tikv status"
+    - port: 9090
+      comment: "Prometheus metric"
+    - port: 22
+      comment: "SSH"
+  custom: []

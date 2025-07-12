@@ -1,0 +1,30 @@
+---
+# Storage configuration
+storage_devices: []
+#  - device: /dev/sdb
+#    fstype: ext4
+#    mount_point: /data
+#    size: 50G
+#    state: present
+#    owner: root
+#    group: root
+#    mode: '0755'
+#    opts: defaults
+#    dump: '0'
+#    passno: '2'
+
+# LVM configuration
+storage_vgs: []
+#  - name: vg_data
+#    devices:
+#      - /dev/sdc
+#      - /dev/sdd
+#    state: present
+
+storage_lvs: []
+#  - name: lv_data
+#    vg: vg_data
+#    size: 100G
+#    fstype: xfs
+#    mount_point: /mnt/data
+#    state: present

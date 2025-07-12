@@ -1,0 +1,53 @@
+#!/bin/bash
+set -eo pipefail
+
+PEER="$1"
+ACTION="$2"
+
+log() {
+    logger -t drbd-fence "$*"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+}
+
+fence_peer() {
+    local peer="$1"
+    log "Fencing peer $peer"
+    
+    {% if drbd_fence_method == 'ipmi' %}
+    ipmitool -H "$peer-ipmi" -U {{ drbd_ipmi_user }} -P {{ drbd_ipmi_password }} power cycle
+    {% elif drbd_fence_method == 'api' %}
+    curl -X POST \
+        -H "Authorization: Bearer {{ drbd_api_token }}" \
+        -H "Content-Type: application/json" \
+        -d '{"action": "reboot"}' \
+        "{{ drbd_api_endpoint }}/$peer"
+    {% endif %}
+}
+
+unfence_peer() {
+    local peer="$1"
+    log "Unfencing peer $peer"
+    
+    {% if drbd_fence_method == 'ipmi' %}
+    ipmitool -H "$peer-ipmi" -U {{ drbd_ipmi_user }} -P {{ drbd_ipmi_password }} power on
+    {% elif drbd_fence_method == 'api' %}
+    curl -X POST \
+        -H "Authorization: Bearer {{ drbd_api_token }}" \
+        -H "Content-Type: application/json" \
+        -d '{"action": "start"}' \
+        "{{ drbd_api_endpoint }}/$peer"
+    {% endif %}
+}
+
+case "$ACTION" in
+    fence)
+        fence_peer "$PEER"
+        ;;
+    unfence)
+        unfence_peer "$PEER"
+        ;;
+    *)
+        log "Unknown action: $ACTION"
+        exit 1
+        ;;
+esac

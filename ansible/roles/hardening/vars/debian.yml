@@ -1,0 +1,9 @@
+---
+security_required_packages:
+  - aide
+  - auditd
+  - libpam-pwquality
+  - openssh-server
+  - apparmor
+  - apparmor-utils
+  - ufw

@@ -1,0 +1,52 @@
+%YAML 1.1
+---
+# suricata.yaml
+#
+# This is the main Suricata configuration file.
+#
+# Documentation for this file can be found in the Suricata
+# User Guide:
+# https://suricata.readthedocs.io/en/latest/
+
+#
+# Setup global settings
+#
+default-log-dir: {{ suricata_log_dir }}
+
+{% if suricata_rules_dir_exists and (suricata_rules_count|int) > 0 %}
+rule-files:
+ - {{ suricata_rules_dir }}/*.rules
+{% endif %}
+
+vars:
+  address-groups:
+    HOME_NET: "[{{ suricata_home_net | join(',') }}]"
+    EXTERNAL_NET: "!$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "[80,8080,8000,8888]"
+    SSH_PORTS: "[22]"
+
+# configure interface using af-packet
+{% if suricata_mode == "af-packet" and suricata_interfaces is defined and suricata_interfaces | length > 0 %}
+af-packet:
+{% for interface in suricata_interfaces %}
+{% if interface.copy is defined %}
+  - interface: "{{ interface.name }}"
+    threads: 4
+    defrag: no
+    cluster-type: cluster_flow
+    copy-mode: ips
+    copy-iface: "{{ interface.copy }}
+    buffer-size: 64535
+{% endif %}
+{% endfor %}
+{% endif %}
+
+{% if suricata_mode == "nfqueue" %}
+nfqueue:
+  enabled: yes
+  queue-ids: "{{ suricata_nfqueue_queue_ids }}"
+  threads: "{{ suricata_nfqueue_threads }}"
+  #mode: repeat  # Optional: repeat or accept (default)
+{% endif %}

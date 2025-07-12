@@ -1,0 +1,31 @@
+---
+sysctl_security_params:
+  - key: kernel.modules_disabled
+    value: 1
+  - key: kernel.sysrq
+    value: 0
+  - key: net.ipv4.conf.all.accept_redirects
+    value: 0
+  - key: net.ipv4.conf.all.log_martians
+    value: 1
+  - key: net.ipv4.icmp_echo_ignore_broadcasts
+    value: 1
+  - key: net.ipv4.tcp_syncookies
+    value: 1
+
+password_policies:
+  - key: PASS_MAX_DAYS
+    value: 90
+  - key: PASS_MIN_DAYS
+    value: 7
+  - key: PASS_WARN_AGE
+    value: 14
+
+remove_suid_sgid_files:
+  - /usr/bin/chage
+  - /usr/bin/gpasswd
+  - /usr/bin/wall
+  - /usr/bin/chfn
+  - /usr/bin/chsh
+  - /usr/bin/newgrp
+  - /usr/bin/write

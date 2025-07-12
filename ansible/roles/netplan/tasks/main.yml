@@ -1,0 +1,67 @@
+---
+- name: Configure network forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+  when: enable_forwarding | bool and is_gateway_machine | bool
+
+- name: Load network configuration
+  block:
+    - name: Check bridges configuration file
+      stat:
+        path: "{{ bridges_file }}"
+      register: bridges_file_exist
+      when: bridges_file is defined
+
+    - name: Load bridge configuration from file
+      include_vars:
+        file: "{{ bridges_file }}"
+        name: net_config
+      when: 
+        - bridges_file is defined
+        - bridges_file_exist.stat.exists
+
+    - name: Process network interfaces configuration
+      set_fact:
+        net_interfaces: >-
+          {{
+            (net_interfaces | default([])) +
+            [{
+              'ip': item.ip | default(''),
+              'iface': item.iface,
+              'netmask': item.netmask | default(24),
+              'gateway': item.gateway | default(''),
+              'routes': item.routes | default([])
+            }]
+          }}
+      loop: "{{ net_config.interfaces | default([]) }}"
+      when: net_config is defined
+  when: not is_gateway_machine | bool
+
+- name: Configure network interfaces
+  block:
+    - name: Render netplan configuration
+      template:
+        src: "netplan-{{ 'gateway' if is_gateway_machine else 'instance' }}.yaml.j2"
+        dest: /etc/netplan/99-configure-interfaces.yaml
+        owner: root
+        group: root
+        mode: '0600'
+      notify: apply netplan config
+
+    - name: Render network dispatcher scripts
+      template:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        owner: root
+        group: root
+        mode: '0744'
+      loop:
+        - src: "netplan-{{ 'gateway' if is_gateway_machine else 'instance' }}-ifup.sh.j2"
+          dest: /etc/networkd-dispatcher/routable.d/50-ifup-hooks
+        - src: "netplan-{{ 'gateway' if is_gateway_machine else 'instance' }}-ifdown.sh.j2"
+          dest: /etc/networkd-dispatcher/off.d/50-ifdown-hooks
+  when: net_interfaces | default([]) | length > 0

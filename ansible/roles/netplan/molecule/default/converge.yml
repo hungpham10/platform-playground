@@ -1,0 +1,26 @@
+---
+- name: Configure Gateway
+  hosts: gateway
+  vars:
+    is_gateway_machine: true
+    bridges:
+      - iface: eth1
+        ip: 192.168.1.1
+        netmask: 24
+        routes:
+          - to: 192.168.2.0/24
+            via: 192.168.1.2
+  roles:
+    - role: netplan
+
+- name: Configure Instance
+  hosts: instance
+  vars:
+    is_gateway_machine: false
+    net_interfaces:
+      - iface: eth0
+        ip: 192.168.1.2
+        netmask: 24
+        gateway: 192.168.1.1
+  roles:
+    - role: netplan

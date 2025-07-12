@@ -1,0 +1,24 @@
+---
+# NTP mode: 'server' or 'client'
+ntp_mode: "client"
+
+# NTP server configuration
+ntp_restrict:
+  - "127.0.0.1"
+  - "::1"
+
+# Upstream NTP servers for server mode
+ntp_upstream_servers:
+  - "0.pool.ntp.org"
+  - "1.pool.ntp.org"
+  - "2.pool.ntp.org"
+  - "3.pool.ntp.org"
+
+# NTP server to sync with in client mode (default points to cluster NTP server)
+ntp_master_server: "{{ groups['ntp_server'][0] }}"
+
+# Network configuration
+ntp_allowed_networks:
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"

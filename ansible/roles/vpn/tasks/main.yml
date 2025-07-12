@@ -1,0 +1,70 @@
+---
+- name: Install WireGuard
+  apt:
+    name:
+      - wireguard
+      - iptables
+    state: present
+    update_cache: yes
+
+- name: Enable IP forwarding
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_set: yes
+    reload: yes
+
+- name: Verify IP forwarding is enabled
+  sysctl:
+    name: net.ipv4.ip_forward
+    value: "1"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  when: vpn_mode == 'server'
+
+- name: Install routing tools
+  apt:
+    name:
+      - iproute2
+      - iptables
+    state: present
+  when: vpn_mode == 'server'
+
+- name: Create WireGuard directory
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+
+- name: Generate private key
+  shell: 
+    cmd: wg genkey > {{ wg_private_key_path }}
+    creates: "{{ wg_private_key_path }}"
+  when: vpn_mode == 'server'
+
+- name: Generate public key
+  shell:
+    cmd: cat {{ wg_private_key_path }} | wg pubkey > {{ wg_public_key_path }}
+    creates: "{{ wg_public_key_path }}"
+  when: vpn_mode == 'server'
+
+- name: Generate preshared key
+  shell:
+    cmd: wg genpsk > {{ wg_preshared_key_path }}
+    creates: "{{ wg_preshared_key_path }}"
+  when: vpn_mode == 'server'
+
+- name: Configure WireGuard interface
+  template:
+    src: "wg0.conf.j2"
+    dest: "/etc/wireguard/{{ wg_interface }}.conf"
+    mode: '0600'
+  notify: restart wireguard
+
+- name: Enable and start WireGuard
+  systemd:
+    name: "wg-quick@{{ wg_interface }}"
+    state: started
+    enabled: yes

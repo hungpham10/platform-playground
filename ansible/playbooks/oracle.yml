@@ -1,0 +1,74 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure Oracle RAC with ASM
+  hosts: oracle_cluster
+  become: true
+
+  pre_tasks:
+    - name: Include base configuration
+      include_tasks: boilerplate.yml
+      vars:
+        instance_role: oracle
+      tags: ["always"]
+
+    - name: Validate Oracle RAC requirements
+      assert:
+        that:
+          - ansible_memtotal_mb >= 16384
+          - ansible_processor_vcpus >= 4
+          - ansible_swaptotal_mb >= 16384
+        fail_msg: "Host does not meet RAC requirements"
+        tags: ["preflight"]
+
+    - name: Verify cluster prerequisites
+      command: "{{ item }}"
+      loop:
+        - "/usr/sbin/cluvfy stage -pre crsinst -n {{ oracle_cluster_nodes | map(attribute='name') | join(',') }}"
+        - "/usr/sbin/cluvfy stage -pre dbinst -n {{ oracle_cluster_nodes | map(attribute='name') | join(',') }}"
+      changed_when: false
+      when: inventory_hostname == groups['oracle_primary'][0]
+      tags: ["preflight"]
+
+  roles:
+    - role: oracle/asm
+      tags: ["asm"]
+
+    - role: oracle/rac
+      tags: ["rac"]
+
+  post_tasks:
+    - name: Verify cluster status
+      command: "crsctl check cluster -all"
+      register: cluster_status
+      changed_when: false
+      failed_when: "'SUCCESS' not in cluster_status.stdout"
+      become: true
+      become_user: grid
+      tags: ["verify"]
+
+    - name: Verify ASM diskgroups
+      command: "asmcmd lsdg"
+      register: asm_status
+      changed_when: false
+      failed_when: "'DATA' not in asm_status.stdout or 'OCR' not in asm_status.stdout"
+      become: true
+      become_user: grid
+      tags: ["verify"]
+
+    - name: Verify RAC database status
+      command: "srvctl status database -d {{ rac_database.sid }}"
+      register: db_status
+      changed_when: false
+      failed_when: "'ONLINE' not in db_status.stdout"
+      become: true
+      become_user: oracle
+      when: inventory_hostname == groups['oracle_primary'][0]
+      tags: ["verify"]
+
+    - name: restart suricata
+      systemd:
+        name: suricata
+        state: restarted
+        daemon_reload: yes
+      become: true

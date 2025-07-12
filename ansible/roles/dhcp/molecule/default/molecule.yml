@@ -1,0 +1,30 @@
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: dhcp-server
+    image: ubuntu:22.04
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: /sbin/init
+  - name: dhcp-client
+    image: ubuntu:22.04
+    privileged: true
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    command: /sbin/init
+provisioner:
+  name: ansible
+  inventory:
+    group_vars:
+      all:
+        dhcp_domain_name: "test.local"
+      dhcp_server:
+        dhcp_mode: server
+      dhcp_client:
+        dhcp_mode: client
+verifier:
+  name: ansible

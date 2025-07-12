@@ -1,0 +1,44 @@
+---
+- name: Import boilerplate playbook
+  ansible.builtin.import_playbook: ../../gateway.yml
+
+- name: Additional verification tasks
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Verify package installation
+      package_facts:
+        manager: auto
+      register: installed_packages
+      
+    - name: Verify network configuration
+      command: ip addr show
+      register: network_config
+      changed_when: false
+      
+    - name: Check firewall status
+      command: ufw status
+      register: firewall_status
+      changed_when: false
+      
+    - name: Verify NTP configuration
+      command: systemctl status systemd-timesyncd
+      register: ntp_status
+      changed_when: false
+      failed_when: false
+      
+    - name: Verify VPN configuration
+      stat:
+        path: /etc/wireguard/wg0.conf
+      register: vpn_config
+      when: enable_vpn | default(false) | bool
+
+    - name: Assert critical services
+      assert:
+        that:
+          - "'ufw' in ansible_facts.services"
+          - "'systemd-timesyncd.service' in ansible_facts.services"
+          - "firewall_status.rc == 0"
+        fail_msg: "Critical services verification failed"
+        success_msg: "All critical services verified"

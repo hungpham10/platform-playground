@@ -1,0 +1,7 @@
+---
+- name: Restart logrotate
+  systemd:
+    name: logrotate
+    state: restarted
+    daemon_reload: yes
+  when: ansible_service_mgr == 'systemd'

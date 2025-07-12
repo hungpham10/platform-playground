@@ -1,0 +1,88 @@
+---
+- name: Verify OS family
+  fail:
+    msg: "This role only supports RedHat family"
+  when: ansible_os_family != "RedHat"
+
+- name: Verify Grid Infrastructure prerequisites
+  command: "{{ item }}"
+  loop:
+    - "/usr/sbin/cluvfy stage -pre crsinst -n {{ oracle_cluster_nodes | map(attribute='name') | join(',') }}"
+    - "/usr/sbin/cluvfy stage -pre dbinst -n {{ oracle_cluster_nodes | map(attribute='name') | join(',') }}"
+  changed_when: false
+  when: inventory_hostname == groups['oracle_primary'][0]
+
+- name: Create Grid Infrastructure directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: grid
+    group: oinstall
+    mode: '0755'
+  loop:
+    - "{{ grid_home }}"
+    - "{{ grid_base }}"
+    - "{{ oracle_inventory }}"
+
+- name: Configure Grid Infrastructure response file
+  template:
+    src: grid_install.rsp.j2
+    dest: "{{ grid_home }}/grid_install.rsp"
+    owner: grid
+    group: oinstall
+    mode: '0644'
+
+- name: Extract Grid Infrastructure files
+  unarchive:
+    src: "{{ grid_installer_location }}/{{ grid_installer_archive }}"
+    dest: "{{ grid_home }}"
+    remote_src: true
+    owner: grid
+    group: oinstall
+  when: inventory_hostname == groups['oracle_primary'][0]
+
+- name: Install Grid Infrastructure
+  command:
+    cmd: "./gridSetup.sh -silent -responseFile {{ grid_home }}/grid_install.rsp"
+    chdir: "{{ grid_home }}/grid"
+  become: true
+  become_user: grid
+  environment:
+    ORACLE_HOME: "{{ grid_home }}"
+    ORACLE_BASE: "{{ grid_base }}"
+  when: inventory_hostname == groups['oracle_primary'][0]
+
+- name: Run root scripts on primary node
+  command: "{{ item }}"
+  loop:
+    - "{{ oracle_inventory }}/orainstRoot.sh"
+    - "{{ grid_home }}/root.sh"
+  when: inventory_hostname == groups['oracle_primary'][0]
+
+- name: Wait for primary node configuration
+  pause:
+    seconds: 30
+  when: inventory_hostname != groups['oracle_primary'][0]
+
+- name: Run root scripts on other nodes
+  command: "{{ item }}"
+  loop:
+    - "{{ oracle_inventory }}/orainstRoot.sh"
+    - "{{ grid_home }}/root.sh"
+  when: inventory_hostname != groups['oracle_primary'][0]
+
+- name: Configure SCAN listeners
+  command: "srvctl add scan -scan {{ scan_name }} -scanport {{ scan_port }}"
+  become: true
+  become_user: grid
+  when: inventory_hostname == groups['oracle_primary'][0]
+
+- name: Start cluster services
+  command: "{{ item }}"
+  loop:
+    - "crsctl start cluster -all"
+    - "srvctl start scan"
+    - "srvctl start scan_listener"
+  become: true
+  become_user: grid
+  when: inventory_hostname == groups['oracle_primary'][0]

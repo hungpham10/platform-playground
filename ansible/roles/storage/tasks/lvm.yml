@@ -1,0 +1,15 @@
+---
+- name: Create volume groups
+  lvg:
+    vg: "{{ item.name }}"
+    pvs: "{{ item.devices | join(',') }}"
+    state: "{{ item.state }}"
+  loop: "{{ storage_vgs }}"
+
+- name: Create logical volumes
+  lvol:
+    vg: "{{ item.vg }}"
+    lv: "{{ item.name }}"
+    size: "{{ item.size }}"
+    state: "{{ item.state }}"
+  loop: "{{ storage_lvs }}"
