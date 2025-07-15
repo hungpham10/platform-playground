@@ -1,5 +1,5 @@
 locals {
-  workspace_vars = read_terragrunt_config(find_in_parent_folders("terragrunt.hcl"))
+  workspace_vars = read_terragrunt_config("${get_terragrunt_dir()}/../terragrunt.hcl")
 
   # @NOTE: extract organization variables
   organization = local.workspace_vars.locals.organization

@@ -18,7 +18,18 @@ locals {
 }
 
 resource "aws_subnet" "this" {
-  count      = length(var.subnets)
-  vpc_id     = var.vpc
-  cidr_block = var.subnets[count.index].cidr
+  count             = length(var.subnets)
+  vpc_id            = var.vpc
+  availability_zone = var.subnets[count.index].zone
+  cidr_block        = var.subnets[count.index].cidr
+
+  tags  = merge(
+    { 
+      "Name" = var.name,
+      "Kind" = var.kind,
+    },
+    var.kind != "public" ? { "Environment" = var.environment } : {},
+    var.tags,
+    var.subnet_tags,
+  )
 }

@@ -31,3 +31,16 @@ variable "aws" {
     secret_key: string
   })
 }
+
+variable "subnet_tags" {
+  description = "Additional tags for the subnet"
+  type        = map(string)
+  default     = {}
+}
+
+variable "tags" {
+  description = "A map of tags to add to all resources"
+  type        = map(string)
+  default     = {}
+}
+
