@@ -15,3 +15,9 @@ module "public-subnet" {
   subnets = var.subnets
   vpc     = module.vpc.id
 }
+
+module "kafka" {
+}
+
+module "elasticsearch" {
+}
