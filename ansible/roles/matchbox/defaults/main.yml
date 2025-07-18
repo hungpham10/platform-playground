@@ -1,0 +1,14 @@
+---
+matchbox_version: "v0.11.0"
+matchbox_arch_map:
+  x86_64: "linux-amd64"
+  aarch64: "linux-arm64"
+matchbox_arch: "{{ matchbox_arch_map[ansible_architecture] | default('linux-amd64') }}"
+matchbox_download_url: "https://github.com/poseidon/matchbox/releases/download/{{ matchbox_version }}/matchbox-{{ matchbox_version }}-{{ matchbox_arch }}.tar.gz"
+matchbox_install_dir: "/usr/local/bin"
+matchbox_config_dir: "/etc/matchbox"
+matchbox_data_dir: "/var/lib/matchbox"
+matchbox_assets_dir: "/var/lib/matchbox/assets"
+matchbox_user: "matchbox"
+matchbox_group: "matchbox"
+matchbox_ip: "{{ ansible_default_ipv4.address | default('0.0.0.0') }}"

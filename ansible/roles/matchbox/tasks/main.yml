@@ -1,0 +1,69 @@
+---
+- name: Create Matchbox directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ matchbox_user }}"
+    group: "{{ matchbox_group }}"
+    mode: '0755'
+  loop:
+    - "{{ matchbox_config_dir }}"
+    - "{{ matchbox_data_dir }}"
+    - "{{ matchbox_assets_dir }}"
+  become: yes
+
+- name: Download Matchbox binary
+  ansible.builtin.get_url:
+    url: "{{ matchbox_download_url }}"
+    dest: "/tmp/matchbox-{{ matchbox_version }}-{{ matchbox_arch }}.tar.gz"
+    mode: '0644'
+    checksum: "sha256:{{ lookup('url', matchbox_download_url, split_lines=False) | hash('sha256') }}"
+  become: yes
+  register: download_result
+  until: download_result is success
+  retries: 3
+  delay: 5
+
+- name: Extract Matchbox binary
+  ansible.builtin.unarchive:
+    src: "/tmp/matchbox-{{ matchbox_version }}-{{ matchbox_arch }}.tar.gz"
+    dest: "/tmp"
+    remote_src: yes
+  become: yes
+
+- name: Install Matchbox binary
+  ansible.builtin.copy:
+    src: "/tmp/matchbox-{{ matchbox_version }}-{{ matchbox_arch }}/matchbox"
+    dest: "{{ matchbox_install_dir }}/matchbox"
+    owner: "{{ matchbox_user }}"
+    group: "{{ matchbox_group }}"
+    mode: '0755'
+    remote_src: yes
+  become: yes
+
+- name: Create Matchbox systemd service
+  ansible.builtin.template:
+    src: matchbox.service.j2
+    dest: /etc/systemd/system/matchbox.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+  notify: Restart Matchbox
+
+- name: Ensure Matchbox service is started and enabled
+  ansible.builtin.systemd:
+    name: matchbox
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+  register: service_result
+  failed_when: service_result.state != "started"
+
+- name: Clean up downloaded tarball
+  ansible.builtin.file:
+    path: "/tmp/matchbox-{{ matchbox_version }}-{{ matchbox_arch }}.tar.gz"
+    state: absent
+  become: yes
+  when: download_result is defined and download_result.changed

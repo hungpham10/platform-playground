@@ -19,15 +19,14 @@
       when: instance_role == 'gateway'
       tags: ["security", "ids"]
 
-    # @TODO: thinking about using tftp on top of nfs/drbd and use ipvs to configure alias ip for fetching data
-    - role: tftp
-      vars:
-        tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
-        boot_menu_items: "{{ pxe_menu_items | default([]) }}"
-      when: instance_role == 'gateway'
-      tags: ["network", "tftp"]
+    # @NOTE: setup matchbox
+    - role: matchbox
+      when:
+        - instance_role == 'gateway' 
+      tags: ["installer"]
 
-    # Setup ipvs to group tftp cluster
+    ## @TODO: thinking about using tftp on top of nfs/drbd and use ipvs to configure alias ip for fetching data
+    ## Setup ipvs to group tftp cluster
     #- role: loadbalancer/ipvs
     #  vars:
     #    ipvs_services:
@@ -39,3 +38,11 @@
     #        real_servers: "{{ gateway_real_servers }}"
     #  when: instance_role == 'gateway' and gateway_virtual_ip is defined and gateway_real_servers is defined
     #  tags: ["network", "ipvs", "tftp"]
+
+    #- role: tftp
+    #  vars:
+    #    tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
+    #    boot_menu_items: "{{ pxe_menu_items | default([]) }}"
+    #  when: instance_role == 'gateway'
+    #  tags: ["network", "tftp"]
+

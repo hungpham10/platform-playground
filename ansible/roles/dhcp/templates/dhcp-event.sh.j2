@@ -31,28 +31,25 @@ function log() {
     logger "$(date '+%Y-%m-%d %H:%M:%S') $1"
 }
 
+function perform_handlers_to_resolve_notify_from_dhcpd() {
+    for handler in $(ls -1c /etc/dhcp/events/$1); do
+        $handler $2 $3
+    done
+}
+
 case "$1" in
     "commit")
         log "New lease: $2 ($3)"
         
         notify_agent_node_has_been_starting $2 $3
 
-        # Add to dynamic inventory
-        echo "$2 ansible_host=$3 instance_role=$(get_instance_role_from_agent $2 $3)" >> "$INVENTORY_FILE"
-        
-        # Wait for SSH to become available
-        for i in {1..30}; do
-            if ssh-keyscan -H "$3" >> "$KNOWN_HOSTS_FILE" 2>/dev/null; then
-                log "SSH key collected for $2 ($3)"
-                break
-            fi
-            sleep 2
-        done
+        perform_handlers_to_resolve_notify_from_dhcpd $1 $2 $3
 
         notify_agent_node_has_been_started $2 $3
         ;;
         
     "release"|"expiry")
+        perform_handlers_to_resolve_notify_from_dhcpd $1 $2 $3
         notify_agent_node_has_been_removed $2 $3
 
         log "Removed lease: $2 ($3)"

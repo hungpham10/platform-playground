@@ -23,15 +23,3 @@ firewall_rules:
   #  - "-A FORWARD -i eth0 -o br-data -m state --state RELATED,ESTABLISHED -j ACCEPT"
   input: []
   #  - "-A INPUT -i br-data -j ACCEPT"
-
-gateway_real_servers: >-
-  {% if 'gateway' in group_names %}
-  {% set servers = [] %}
-  {% for host in groups['gateway'] %}
-  {% set server = {'address': hostvars[host]['ansible_host'] | default(hostvars[host]['ansible_default_ipv4']['address']), 'weight': 1} %}
-  {% do servers.append(server) %}
-  {% endfor %}
-  {{ servers }}
-  {% else %}
-  []
-  {% endif %}

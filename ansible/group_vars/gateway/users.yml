@@ -5,8 +5,14 @@ role_users:
       uid: 2003
       groups: ['suricata']
       ssh_keys: []
+    - name: matchbox
+      uid: 2004
+      groups: ['matchbox']
+      ssh_keys: []
 
 role_groups:
   gateway:
     - name: suricata
       gid: 2003
+    - name: matchbox
+      gid: 2004

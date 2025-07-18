@@ -12,7 +12,7 @@
           - "ansible_facts.services['systemd-timesyncd.service'].state == 'running'"
           - "ansible_facts.services['isc-dhcp-server.service'].state == 'running'"
           - "ansible_facts.services['tftpd-hpa.service'].state == 'running'"
-          - "ansible_facts.services['suricata.service'].state == 'running'"
+          - "ansible_facts.services['matchbox.service'].state == 'running'"
         fail_msg: "Required services are not running"
         success_msg: "All required services are running"
 

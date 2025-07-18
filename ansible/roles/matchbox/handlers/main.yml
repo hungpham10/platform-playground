@@ -1,0 +1,6 @@
+---
+- name: Restart Matchbox
+  ansible.builtin.systemd:
+    name: matchbox
+    state: restarted
+  become: yes

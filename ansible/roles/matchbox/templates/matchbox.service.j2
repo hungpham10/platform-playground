@@ -1,0 +1,13 @@
+[Unit]
+Description=Matchbox PXE and iPXE provisioning service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart={{ matchbox_install_dir }}/matchbox -address={{ matchbox_ip }}:8080 -data-path={{ matchbox_data_dir }} 
+Restart=on-failure
+User={{ matchbox_user }}
+Group={{ matchbox_group }}
+
+[Install]
+WantedBy=multi-user.target

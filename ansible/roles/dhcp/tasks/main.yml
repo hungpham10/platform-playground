@@ -52,6 +52,21 @@
         name: isc-dhcp-server
         state: started
         enabled: yes
+
+    - name: Create DHCP directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop:
+        - "/etc/dhcp"
+        - "/etc/dhcp/events"
+        - "/etc/dhcp/events/commit"
+        - "/etc/dhcp/events/expiry"
+        - "/etc/dhcp/events/release"
+      become: yes
   when: dhcp_defaults.mode == 'server'
 
 - name: Configure DHCP event handling

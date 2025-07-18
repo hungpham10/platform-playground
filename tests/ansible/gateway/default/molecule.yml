@@ -37,6 +37,7 @@ provisioner:
         ansible_become_password: "${SUDO_PASSWORD}"
         network_interfaces:
           - name: ens160
+            type: ethernet
             addresses:
               - "${INSTANCE_IP}/24"
             gateway4: "${INSTANCE_GW}"
@@ -44,5 +45,8 @@ provisioner:
               addresses: ["8.8.8.8", "8.8.4.4"]
         public_gateway: "${INSTANCE_GW}"
         instance_role: gateway
+  extra_args:
+    - "--tags"
+    - "installer,always"
 verifier:
   name: ansible
