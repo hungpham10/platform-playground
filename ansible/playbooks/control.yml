@@ -1,0 +1,41 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure Controller Instance
+  hosts: gateway-*
+  become: true
+  vars:
+    instance_role: gateway
+  roles:
+    # @NOTE: setup matchbox
+    - role: matchbox
+      when:
+        - instance_role == 'gateway' 
+      tags: ["network", "matchbox"]
+
+    # @NOTE: setup tftp
+    - role: tftp
+      vars:
+        tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
+        boot_menu_items: "{{ pxe_menu_items | default([]) }}"
+      when: instance_role == 'gateway'
+      tags: ["network", "tftp"]
+
+    # @NOTE: Setup ipvs to group tftp cluster
+    - role: loadbalancer/ipvs
+      vars:
+        ipvs_services:
+          - name: tftp
+            address: "{{ gateway_virtual_ip }}"
+            port: 69
+            protocol: udp
+            scheduler: wrr
+            real_servers: "{{ gateway_real_servers }}"
+      when: instance_role == 'gateway' and gateway_virtual_ip is defined and gateway_real_servers is defined
+      tags: ["network", "ipvs"]
+
+    # @TODO: setup custom scripts to link between dhcpd, tftp and matchbox
+    
+    # @TODO: setup custom script to link between dhcpd and suricata
+
+    # @TODO: thinking about using tftp on top of nfs/drbd and use ipvs to configure alias ip for fetching data

@@ -1,0 +1,15 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure Watchdog Instance
+    - role: suricata
+      vars:
+        suricata_home_net: >-
+          {{
+            ([ansible_default_ipv4.network + '/' + (ansible_default_ipv4.netmask | ansible.utils.ipaddr('prefix') | string)]) +
+            (network_interfaces | selectattr('type', 'equalto', 'bridge') | map(attribute='addresses') | flatten | list)
+          }}
+        suricata_interfaces: >-
+          {{ network_interfaces }}
+      when: instance_role == 'gateway'
+      tags: ["security", "ids"]

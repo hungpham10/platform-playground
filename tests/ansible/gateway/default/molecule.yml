@@ -47,6 +47,6 @@ provisioner:
         instance_role: gateway
   extra_args:
     - "--tags"
-    - "installer,always"
+    - "network,always"
 verifier:
   name: ansible
