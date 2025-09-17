@@ -6,18 +6,6 @@
       - ansible_processor_vcpus >= 2
     fail_msg: "Host does not meet PostgreSQL requirements"
 
-- name: Configure PostgreSQL repository
-  template:
-    src: pgdg.repo.j2
-    dest: "{{ postgres_repo_path }}"
-    mode: '0644'
-  when: ansible_os_family == "RedHat"
-
-- name: Install PostgreSQL packages
-  package:
-    name: "{{ postgres_packages }}"
-    state: present
-
 - name: Create PostgreSQL directories
   file:
     path: "{{ item }}"
@@ -29,13 +17,6 @@
     - "{{ postgres_data_dir }}"
     - "{{ postgres_backup_dir }}"
     - "{{ postgres_archive_dir }}"
-
-- name: Initialize PostgreSQL database
-  command:
-    cmd: "{{ postgres_initdb_cmd }}"
-    creates: "{{ postgres_data_dir }}/PG_VERSION"
-  become: true
-  become_user: postgres
 
 - name: Configure PostgreSQL
   template:
@@ -132,12 +113,40 @@
     - { src: check-replication.sh.j2, dest: check-replication.sh }
   when: postgres_replication_role in ['master', 'standby']
 
+- name: Create systemd override directory
+  file:
+    path: /etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d
+    state: directory
+    mode: '0755'
+
+- name: Create override.conf for custom config path
+  copy:
+    dest: /etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d/override.conf
+    content: |
+      [Unit]
+      AssertPathExists=/var/lib/postgresql/%I/postgresql.conf
+      RequiresMountsFor=/var/lib/postgresql/%I
+
+      [Service]
+      ExecStart=
+      ExecStart=/usr/bin/pg_ctlcluster --skip-systemctl-redirect -o "-c config_file=/var/lib/postgresql/%I/postgresql.conf" %i start
+  notify: daemon reload
+
 - name: Start and enable PostgreSQL
   systemd:
     name: "{{ postgres_service }}"
     state: started
     enabled: yes
     daemon_reload: yes
+
+- name: Set password for postgres user
+  postgresql_user:
+    name: postgres
+    password: "{{ postgres_admin_password }}"
+    state: present
+  become: true
+  become_user: postgres
+  no_log: true
 
 - name: Create PostgreSQL users
   postgresql_user:

@@ -1,16 +1,4 @@
 ---
-# VPC Network Configuration
-vpc_networks:
-  management:
-    cidr: "10.0.0.0/16"
-    gateway: "10.0.0.1"
-  kubernetes:
-    cidr: "172.16.0.0/16"
-    gateway: "172.16.0.1"
-  data:
-    cidr: "192.168.0.0/16"
-    gateway: "192.168.0.1"
-
 # Default network configuration
 network_defaults:
   is_gateway_machine: false
@@ -38,15 +26,7 @@ firewall_rules:
   tcp_ports:
     - port: 22
       comment: "SSH"
-    - port: 80
-      comment: "HTTP"
-    - port: 443
-      comment: "HTTPS"
-  udp_ports:
-    - port: 53
-      comment: "DNS"
-    - port: 123
-      comment: "NTP"
+  udp_ports: []
 
 # Example cluster nodes configuration
 cluster_nodes:

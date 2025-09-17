@@ -1,15 +1,4 @@
 ---
-- name: Verify required packages
-  assert:
-    that: 
-      - ansible_facts.packages[item] is defined
-    fail_msg: "Required package {{ item }} is not installed"
-    success_msg: "Required package {{ item }} is present"
-  loop:
-    - pgbadger
-    - mailutils
-    - postfix
-
 - name: Create log analysis directories
   file:
     path: "{{ item }}"

@@ -1,24 +1,78 @@
-listen_addresses = '{{ postgres_listen_addresses }}'
-port = {{ postgres_port }}
-max_connections = {{ postgres_max_connections }}
+# -----------------------------
+# PostgreSQL Configuration File
+# -----------------------------
 
-# Memory Configuration
+# This file consists of parameter settings, one per line.
+# Blank lines are ignored. Comments begin with '#' and extend to the end of the line.
+# Parameter values that are not simple identifiers or numbers must be single-quoted.
+# To embed a single quote in a parameter value, write either two quotes (preferred) or backslash-quote.
+
+#------------------------------------------------------------------------------
+# FILE LOCATIONS
+#------------------------------------------------------------------------------
+
+# The default values of these variables are driven from the -D command-line
+# option or PGDATA environment variable, represented here as ConfigDir.
+
+data_directory = '{{ postgres_data_dir }}'          # use data in another directory
+                                                    # (change requires restart)
+hba_file = '{{ postgres_config_path }}/pg_hba.conf'        # host-based authentication file
+                                                           # (change requires restart)
+ident_file = '{{ postgres_config_path }}/pg_ident.conf'    # ident configuration file
+                                                           # (change requires restart)
+
+# If external_pid_file is not explicitly set, no extra PID file is written.
+external_pid_file = '/var/run/postgresql/14-main.pid'                   # write an extra PID file
+                                                                        # (change requires restart)
+                                                                        #
+# ------------------------------------------------------------------------------
+# CONNECTIONS AND AUTHENTICATION
+# ------------------------------------------------------------------------------
+
+listen_addresses = '{{ postgres_listen_addresses }}' # What IP address(es) to listen on; '*' for all
+port = {{ postgres_port }}
+max_connections = {{ postgres_max_connections }}     # (change requires restart)
+superuser_reserved_connections = 3                   # (change requires restart)
+unix_socket_directories = '/var/run/postgresql'      # comma-separated list of directories
+
+# ------------------------------------------------------------------------------
+# RESOURCE USAGE (Memory)
+# ------------------------------------------------------------------------------
 shared_buffers = {{ postgres_shared_buffers }}
 effective_cache_size = {{ postgres_effective_cache_size }}
 maintenance_work_mem = {{ postgres_maintenance_work_mem }}
 work_mem = {{ postgres_work_mem }}
 
-# WAL Configuration
+# ------------------------------------------------------------------------------
+# WRITE AHEAD LOG (WAL)
+# ------------------------------------------------------------------------------
 wal_level = {{ postgres_wal_level }}
 max_wal_senders = {{ postgres_max_wal_senders }}
 max_replication_slots = {{ postgres_max_replication_slots }}
 archive_mode = {{ postgres_archive_mode }}
 archive_command = '{{ postgres_archive_command }}'
 
-# Logging Configuration
-logging_collector = on
-log_directory = 'pg_log'
-log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+# ------------------------------------------------------------------------------
+# LOGGING
+# ------------------------------------------------------------------------------
+
+log_destination = 'stderr'      # Valid values are stderr, csvlog, syslog, eventlog
+logging_collector = on          # Enable capturing of stderr and csvlog
+log_directory = 'log'           # Directory where log files are written
+log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log' # Log file name pattern
 log_rotation_age = 1d
 log_rotation_size = 0
 log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
+log_connections = on            # Log each successful connection
+log_disconnections = on         # Log each session end
+log_min_duration_statement = 1000 # Log statements running at least this many milliseconds
+
+# ------------------------------------------------------------------------------
+# AUTOVACUUM PARAMETERS
+# ------------------------------------------------------------------------------
+
+autovacuum = on                 # Enable autovacuum subprocess
+log_autovacuum_min_duration = 0 # Log autovacuum actions taking at least this many milliseconds
+autovacuum_max_workers = 3      # Max number of autovacuum subprocesses
+autovacuum_vacuum_scale_factor = 0.2 # Fraction of table size to add to vacuum_threshold
+autovacuum_analyze_scale_factor = 0.1 # Fraction of table size to add to analyze_threshold

@@ -19,6 +19,14 @@ variable "service_accounts" {
   default     = []
 }
 
+variable "service_account_bindings" {
+  description = "Map of service accounts to IAM bindings"
+  type = map(list(object({
+    role   = string
+    member = string
+  })))
+}
+
 variable "access_token" {
   description = "The google cloud platform access token which will be generated each time"
   type        = string

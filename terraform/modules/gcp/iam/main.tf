@@ -38,5 +38,22 @@ resource "google_service_account" "all_service_account" {
   disabled     = each.value.disabled
 }
 
-#resource "google_service_account_iam_member" "all_service_account_iam_member" {
-#}
+locals {
+  service_account_iam_pairs = flatten([
+    for sa, bindings in var.service_account_bindings : [
+      for binding in bindings : {
+        service_account = sa
+        role            = binding.role
+        member          = binding.member
+      }
+    ]
+  ])
+}
+
+resource "google_service_account_iam_member" "all_service_account_iam_member" {
+  for_each = { for idx, b in local.service_account_iam_pairs : "${b.service_account}-${b.role}-${b.member}" => b }
+
+  service_account_id = "projects/${var.gcp.project_id}/serviceAccounts/${each.value.service_account}"
+  role               = each.value.role
+  member             = each.value.member
+}

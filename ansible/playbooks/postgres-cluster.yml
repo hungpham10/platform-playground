@@ -14,8 +14,8 @@
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       loop:
-        - "group_vars/all"
-        - "group_vars/database"
+        - "../group_vars/all"
+        - "../group_vars/database"
       tags: ["always"]
 
     - name: Include host specific variables

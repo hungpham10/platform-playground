@@ -15,18 +15,11 @@ variable "node_pool" {
       preemptible: string
       regular:     string
     })
+    subnetwork: string
+    pod: object({
+      max_pod_per_node: number
+    })
   })
-  default     = {
-    zones         = ["asia-east1-b", "asia-east1-c"]
-    metric        = {
-      preemptible = 1
-      regular     = 0
-    }
-    machine_type  = {
-      preemptible = "n1-standard-4"
-      regular     = "t2d-standard-4"
-    }
-  }
 }
 
 variable "node_version" {
@@ -54,8 +47,21 @@ variable "network" {
 }
 
 variable "subnetwork" {
-  description = "The subnetwork must exist in the same region this instance will be created in, and will be use if network isn't defined"
-  default     = []
+  description = "The name or self_link of the subnetwork to attach to each kind of workload with-in this cluster"
+  type        = string
+  default     = ""
+}
+
+varibale "subnetwork_for_pod" {
+  description = "The subnetwork or self_link in which pod will be allocated"
+  type        = string
+  default     = ""
+}
+
+varibale "subnetwork_for_service" {
+  description = "The subnetwork or self_link in which service will be allocated"
+  type        = string
+  default     = ""
 }
 
 variable "logging_service" {
@@ -217,6 +223,13 @@ variable "total_max_node_count" {
     preemptible: 1
     regular:     1
   }
+}
+
+variable "service_account" {
+  description = "Service account which will be assigned to dedicated resources"
+  type        = object({
+    nodepool: string
+  })
 }
 
 variable "gcp" {

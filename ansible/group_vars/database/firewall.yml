@@ -1,0 +1,6 @@
+
+firewall_rules:
+  tcp_ports:
+    - port: 5432
+      comment: "Postgresql server"
+  udp_ports: []

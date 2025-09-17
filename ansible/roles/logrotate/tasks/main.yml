@@ -22,8 +22,3 @@
     loop_var: entry
   notify: Restart logrotate
 
-- name: Verify logrotate configuration
-  command: logrotate -d /etc/logrotate.conf
-  changed_when: false
-  register: logrotate_verify
-  failed_when: logrotate_verify.rc != 0

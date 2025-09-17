@@ -10,8 +10,8 @@
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       loop:
-        - "group_vars/all"
-        - "group_vars/{{ instance_role }}"
+        - "../group_vars/all"
+        - "../group_vars/{{ instance_role }}"
       tags: ["always"]
 
     - name: Check if host_vars directory exists
@@ -65,6 +65,12 @@
             (role_packages[instance_role] | default([])) +
             (host_specific_packages | default([]))
           }}
+        linux_add_public_signing_keys: >-
+          {{
+            (base_public_signing_keys | default([])) +
+            (role_public_signing_keys[instance_role] | default([])) +
+            (host_public_signing_keys | default([]))
+          }}
       tags: ["system", "packages"]
 
     - role: netplan
@@ -76,8 +82,6 @@
 
     - role: hostname
       vars:
-        domain: "{{ network_defaults.domain | default('lab') }}"
-        net: "{{ network_defaults.net | default('local') }}"
         nodes: >-
           {{
             [{
@@ -149,18 +153,18 @@
         storage_lvs: "{{ instance_storage_lvs | default([]) }}"
       tags: ["storage"]
 
-    - role: audit
-      vars:
-        audit_rules: "{{ audit_rules | default([]) }}"
-        audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
-        audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
-        audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
-        audit_num_logs: "{{ audit_num_logs | default(5) }}"
-        audit_space_left: "{{ audit_space_left | default(75) }}"
-        audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
-        audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
-        audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
-      tags: ["security", "audit"]
+    #- role: audit
+    #  vars:
+    #    audit_rules: "{{ audit_rules | default([]) }}"
+    #    audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
+    #    audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
+    #    audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
+    #    audit_num_logs: "{{ audit_num_logs | default(5) }}"
+    #    audit_space_left: "{{ audit_space_left | default(75) }}"
+    #    audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
+    #    audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
+    #    audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
+    #  tags: ["security", "audit"]
 
     - role: users
       vars:
@@ -179,16 +183,16 @@
         user_password_salt: "{{ user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
       tags: ["system", "users", "security"]
 
-    - role: hardening
-      vars:
-        security_required_packages: "{{ security_packages | default([]) }}"
-        sysctl_security_params: "{{ sysctl_params | default([]) }}"
-        password_policies: "{{ password_default_policies | default([]) }}"
-        remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
-        enable_aide: "{{ enable_file_integrity | default(false) }}"
-        aide_rules: "{{ file_integrity_rules | default([]) }}"
-        audit_rules: "{{ system_audit_rules | default([]) }}"
-      tags: ["security", "hardening"]
+    #- role: hardening
+    #  vars:
+    #    security_required_packages: "{{ security_packages | default([]) }}"
+    #    sysctl_security_params: "{{ sysctl_params | default([]) }}"
+    #    password_policies: "{{ password_default_policies | default([]) }}"
+    #    remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
+    #    enable_aide: "{{ enable_file_integrity | default(false) }}"
+    #    aide_rules: "{{ file_integrity_rules | default([]) }}"
+    #    audit_rules: "{{ system_audit_rules | default([]) }}"
+    #  tags: ["security", "hardening"]
 
   post_tasks:
     - name: Verify all services are running

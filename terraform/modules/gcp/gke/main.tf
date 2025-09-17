@@ -30,6 +30,11 @@ resource "google_container_cluster" "kubernetes" {
   network    = var.network
   subnetwork = var.subnetwork
 
+  ip_allocation_policy {
+    cluster_secondary_range_name  = "gke-pods"
+    services_secondary_range_name = "gke-services"
+  }
+
   # @NOTE: configure monitoring system
   logging_service    = var.logging_service
   monitoring_service = var.monitoring_service
@@ -87,6 +92,11 @@ resource "google_container_cluster" "kubernetes" {
     master_ipv4_cidr_block = "${ var.gke_master_ipv4_cidr_block }"
   }
 
+  # @NOTE: setup workload identity to make Kubernetes service account act like Google service account
+  workload_identity_config {
+    workload_pool = "${var.gcp.project_id}.svc.id.goog"
+  }
+
   # @NOTE: setup master authentication
   master_auth {
     username = ""
@@ -122,17 +132,23 @@ resource "google_container_node_pool" "preemptible_nodepool" {
 
   # @NOTE: node configuration
   node_config {
-    preemptible  = true
-    machine_type = var.node_pool.machine_type.preemptible
+    preemptible     = true
+    machine_type    = var.node_pool.machine_type.preemptible
+    service_account = var.service_account.nodepool
+    oauth_scopes    = [
+      "https://www.googleapis.com/auth/cloud-platform"
+    ]
   }
 
-  # # @NOTE: notification service
-  # notification_config {
-  #   pubsub {
-  #     enabled = var.pubsub_topic != null
-  #     topic   = var.pubsub_topic
-  #   }
-  # }
+  # @NOTE: network configuration
+  network_config {
+    subnetwork          = var.node_pool.subnetwork
+    pod_ipv4_cidr_block = var.nodepool.pod.cidr
+
+    additional_pod_network_configs {
+      max_pod_per_node = var.nodepool.pod.max_pod_per_node
+    }
+  }
 
   version = var.node_version
 
@@ -167,17 +183,21 @@ resource "google_container_node_pool" "regular_nodepool" {
 
   # @NOTE: node configuration
   node_config {
-    preemptible  = false
-    machine_type = var.node_pool.machine_type.regular
+    preemptible     = false
+    subnetwork      = var.node_pool.subnetwork
+    machine_type    = var.node_pool.machine_type.regular
+    service_account = var.service_account.nodepool
+    oauth_scopes    = [
+      "https://www.googleapis.com/auth/cloud-platform"
+    ]
   }
 
-  # # @NOTE: notification service
-  # notification_config {
-  #   pubsub {
-  #     enabled = var.pubsub_topic != null
-  #     topic   = var.pubsub_topic
-  #   }
-  # }
+  max_pod_per_node = var.nodepool.max_pod_per_node
+
+  # @NOTE: network configuration
+  network_config {
+    subnetwork = var.node_pool.subnetwork
+  }
 
   version = var.node_version
 

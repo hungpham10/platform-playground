@@ -1,7 +1,8 @@
 ---
+postgres_service: postgresql
 postgres_version: "15"
 postgres_data_dir: /var/lib/postgresql/{{ postgres_version }}/main
-postgres_config_path: /etc/postgresql/{{ postgres_version }}/main
+postgres_config_path: /var/lib/postgresql/{{ postgres_version }}/main
 postgres_backup_dir: /var/lib/postgresql/backups
 postgres_archive_dir: /var/lib/postgresql/archive
 
@@ -20,7 +21,7 @@ postgres_wal_level: replica
 postgres_max_wal_senders: 10
 postgres_max_replication_slots: 10
 postgres_archive_mode: on
-postgres_archive_command: "test ! -f {{ postgres_archive_dir }}/%f && cp %p {{ postgres_archive_dir }}/%f"
+postgres_archive_command: "/usr/bin/pgbackrest --stanza=main archive-push %p"
 
 # Replication Configuration
 postgres_replication_role: standalone  # Options: master, standby, standalone

@@ -1,0 +1,166 @@
+---
+- import_playbook: boilerplate.yml
+
+- name: Configure PostgreSQL Database Servers
+  hosts: database
+  become: true
+  vars:
+    instance_role: database
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../group_vars/all"
+        - "../group_vars/database"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "{{ playbook_dir }}/host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    - role: storage
+      tags: ["storage"]
+
+    # Add mail configuration before Patroni and Analysis
+    - role: mail
+      vars:
+        mail_relay_host: "{{ mail_defaults.relay_host | default('') }}"
+      tags: ["system", "mail"]
+
+    # PostgreSQL setup
+    - role: postgres/database
+      vars:
+        postgres_version: "{{ postgres_defaults.version }}"
+        postgres_data_dir: "{{ postgres_defaults.data_dir }}"
+        postgres_config_path: "{{ postgres_defaults.conf_dir }}"
+        postgres_backup_dir: "{{ postgres_defaults.backup_dir }}"
+        postgres_archive_dir: "{{ postgres_defaults.archive_dir }}"
+      tags: ["database", "postgres"]
+
+    - role: logrotate
+      vars:
+        logrotate_custom_entries:
+          - name: postgres
+            path: "/var/lib/postgresql/{{ postgres_defaults.version }}/main/log/*.log"
+            frequency: daily
+            options:
+              - daily
+              - rotate 7
+              - compress
+              - delaycompress
+              - missingok
+              - notifempty
+            create: "0640 postgres postgres"
+            postrotate_script: "/usr/lib/postgresql/{{ postgres_defaults.version }}/bin/pg_ctl -D {{ postgres_defaults.data_dir }} reload"
+      tags: ["monitoring"]
+
+    # PostgreSQL analysis and monitoring
+    - role: postgres/analyse
+      vars:
+        postgres_log_dir: "{{ postgres_defaults.log_dir | default('/var/log/postgresql') }}"
+        postgres_log_format: "{{ postgres_defaults.log_format | default('csv') }}"
+        enable_pg_stat_statements: true
+        enable_auto_explain: true
+        pg_analysis_email_to: "{{ mail_defaults.dba_email }}"
+        pg_analysis_smtp_relay: "localhost"
+      tags: ["database", "postgres", "monitoring"]
+
+    # PostgreSQL analysis and monitoring with PMM
+    - role: pmm
+      vars:
+        pmm_server_address: "{{ monitoring_defaults.pmm_server | default('pmm.example.com:443') }}"
+        pmm_server_username: "{{ monitoring_defaults.pmm_username | default('admin') }}"
+        pmm_server_password: "{{ monitoring_defaults.pmm_password | default(vault_pmm_server_password) }}"
+        pmm_node_name: "{{ inventory_hostname }}"
+        pmm_node_type: postgresql
+        pmm_metrics_mode: auto
+        pmm_metrics_resolution: "{{ monitoring_defaults.metrics_resolution | default('1s') }}"
+        pmm_metrics_retention: "{{ monitoring_defaults.metrics_retention | default('30d') }}"
+        pmm_agent_debug: "{{ monitoring_defaults.enable_debug | default(false) }}"
+      tags: ["monitoring", "pmm"]
+  post_tasks:
+    - name: Verify cluster status
+      block:
+      - name: Check if PostgreSQL service is running
+        ansible.builtin.service:
+          name: postgresql
+          state: started
+          enabled: yes
+        check_mode: yes
+        register: pg_service
+        failed_when: pg_service.state != 'started' or not pg_service.enabled
+
+      - name: Test PostgreSQL connection
+        ansible.builtin.command:
+          cmd: psql -U postgres -c "SELECT 1;"
+        become: yes
+        become_user: postgres
+        register: pg_connect
+        failed_when: pg_connect.rc != 0
+
+      - name: Check if PostgreSQL is in standalone mode
+        ansible.builtin.command:
+          cmd: psql -U postgres -c "SELECT pg_is_in_recovery();"
+        become: yes
+        become_user: postgres
+        register: pg_recovery
+        failed_when: pg_recovery.stdout_lines[2] != ' f'
+
+      - name: Check if PostgreSQL port 5432 is open
+        ansible.builtin.command:
+          cmd: "ss -napt"
+        register: port_check
+        failed_when: "'0.0.0.0:5432' not in port_check.stdout and ':::5432' not in port_check.stdout"
+        changed_when: false
+
+      - name: Check firewall rules for port 5432
+        ansible.builtin.command:
+          cmd: ufw status
+        register: ufw_status
+        failed_when: "'5432/tcp' not in ufw_status.stdout and 'Status: inactive' not in ufw_status.stdout"
+        changed_when: false
+        ignore_errors: true  # Bỏ qua nếu ufw không được cài đặt
+
+      - name: Check if pgBackRest is installed
+        ansible.builtin.command:
+          cmd: pgbackrest version
+        register: pgbackrest_version
+        failed_when: pgbackrest_version.rc != 0
+
+      - name: Check if pgBackRest configuration file exists
+        ansible.builtin.stat:
+          path: /etc/pgbackrest/pgbackrest.conf
+        register: pgbackrest_conf
+        failed_when: not pgbackrest_conf.stat.exists or pgbackrest_conf.stat.mode != '0640'
+
+      - name: Check if pgBackRest stanza exists
+        ansible.builtin.command:
+          cmd: pgbackrest --stanza=main info
+        become: yes
+        become_user: postgres
+        register: pgbackrest_stanza
+        failed_when: pgbackrest_stanza.rc != 0
+
+      - name: Check if pgBackRest check command succeeds
+        ansible.builtin.command:
+          cmd: pgbackrest --stanza=main check
+        become: yes
+        become_user: postgres
+        register: pgbackrest_check
+        failed_when: pgbackrest_check.rc != 0
+      tags: ["verify", "monitoring"]

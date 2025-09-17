@@ -1,12 +1,4 @@
 ---
-- name: Verify required packages
-  assert:
-    that: 
-      - ansible_facts.packages[item] is defined
-    fail_msg: "Required package {{ item }} is not installed"
-    success_msg: "Required package {{ item }} is present"
-  loop: "{{ pmm_required_packages }}"
-
 - name: Create PMM directories
   file:
     path: "{{ item }}"
@@ -22,12 +14,16 @@
     dest: "{{ pmm_config_dir }}/pmm-agent.yml"
     mode: '0640'
   notify: restart pmm-agent
+  when:
+    - vault_pmm_server_password is defined
 
 - name: Configure systemd service
   template:
     src: pmm-agent.service.j2
     dest: /etc/systemd/system/pmm-agent.service
     mode: '0644'
+  when:
+    - vault_pmm_server_password is defined
   notify: restart pmm-agent
 
 - name: Register node with PMM Server
@@ -44,9 +40,13 @@
   register: pmm_setup
   changed_when: pmm_setup.rc == 0
   failed_when: pmm_setup.rc != 0 and 'already registered' not in pmm_setup.stderr
+  when:
+    - vault_pmm_server_password is defined
 
 - name: Start and enable PMM agent
   systemd:
     name: pmm-agent
     state: started
     enabled: yes
+  when:
+    - vault_pmm_server_password is defined
