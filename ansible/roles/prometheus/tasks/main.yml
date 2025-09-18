@@ -1,0 +1,26 @@
+- name: Render prometheus configuration
+  template:
+    src: prometheus.yml.j2
+    dest: "/etc/prometheus/prometheus-next.yml"
+    owner: "{{ prometheus_user }}"
+    group: "{{ prometheus_group }}"
+    mode: "0644"
+
+- name: Validate Prometheus configuration file
+  command: "promtool check config /etc/prometheus/prometheus-next.yml"
+  register: promtool_check
+  failed_when: promtool_check.rc != 0
+  changed_when: false
+
+- name: Apply prometheus configuration
+  command: "mv /etc/prometheus/prometheus-next.yml /etc/prometheus/prometheus.yml"
+  notify: Restart prometheus
+
+- name: Verify Prometheus metrics endpoint
+  uri:
+    url: "http://localhost:9090/metrics"
+    method: GET
+    status_code: 200
+  register: prometheus_metrics
+  failed_when: prometheus_metrics.status != 200
+

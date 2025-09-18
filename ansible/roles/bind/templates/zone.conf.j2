@@ -1,0 +1,17 @@
+
+{% for zone in internal_zones %}
+zone "{{ zone.name }}" IN {
+  {% if zone.forwarders | length > 0 %}
+    type forward;
+    forwarders { 
+      {% for forwarder in zone.forwarders %}
+        {{ forwarder }}; 
+      {% endfor %}
+    };
+  {% else %}
+    type master;
+    file "{{ zone.database }}";
+  };
+  {% endif %}
+};
+{% endfor %}

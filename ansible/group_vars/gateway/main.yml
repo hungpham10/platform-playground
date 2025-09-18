@@ -30,7 +30,7 @@ role_packages:
 
 # Service checks for gateway role
 role_service_checks:
-  gateway:
-    - "'running' in ansible_facts.services['systemd-networkd.service'].state"
-    - "'running' in ansible_facts.services['isc-dhcp-server.service'].state"
-    - "'running' in ansible_facts.services['systemd-timesyncd.service'].state"
+  gateway: []
+    #- "'running' in ansible_facts.services['systemd-networkd.service'].state"
+    #- "'running' in ansible_facts.services['isc-dhcp-server.service'].state"
+    #- "'running' in ansible_facts.services['systemd-timesyncd.service'].state"

@@ -1,0 +1,4 @@
+digirunner_version: "v4.5.19.0-rc"
+digirunner_memory_request: 128m
+digirunner_memory_limit: 4g
+digirunner_server_port: 18080

@@ -1,0 +1,22 @@
+modules:
+  http_2xx:
+    prober: http
+    timeout: {{ blackbox_default_timeout | default('5s') }}
+    http:
+      valid_http_versions: ['HTTP/1.1', 'HTTP/2.0']
+      method: GET
+      preferred_ip_protocol: "{{ blackbox_ip_protocol | default('ip4') }}"
+      {% if blackbox_headers is defined %}
+      headers:
+        {% for key, value in blackbox_headers.items() %}
+        {{ key }}: "{{ value }}"
+        {% endfor %}
+      {% endif %}
+
+  icmp:
+    prober: icmp
+    timeout: {{ blackbox_default_timeout | default('5s') }}
+
+{% if blackbox_global_config is defined %}
+{{ blackbox_global_config | to_nice_yaml }}
+{% endif %}

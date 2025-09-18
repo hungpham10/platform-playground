@@ -2,6 +2,20 @@
 default-lease-time 600;
 max-lease-time 7200;
 
+{% if bind_tsig_secret | default('') | length > 0 %}
+key "dhcp-key" {
+    algorithm hmac-sha256;
+    secret "{{ bind_tsig_secret }}";
+};
+{% endif %}
+
+{% for zone in zones %}
+zone {{ zone.name }} {
+    primary {{ zone.dns_server }};  # IP của BIND server
+    key dhcp-key;
+}
+{% endfor %}
+
 {% for interface in dhcp_defaults.interfaces %}
 # Network configuration for {{ interface.name }}
 subnet {{ interface.subnet }} netmask {{ interface.netmask }} {

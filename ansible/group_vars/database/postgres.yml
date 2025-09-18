@@ -21,10 +21,10 @@ postgres_defaults:
 # Database users
 postgres_database_users:
   - name: app_user
-    password: "{{ vault_app_user_password }}"
+    password: "{{ vault_app_user_password | default('') }}"
     flags: "NOSUPERUSER,NOCREATEDB"
   - name: readonly_user
-    password: "{{ vault_readonly_user_password }}"
+    password: "{{ vault_readonly_user_password | default('') }}"
     flags: "NOSUPERUSER,NOCREATEDB"
 
 # Databases

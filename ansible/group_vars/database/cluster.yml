@@ -11,9 +11,9 @@ patroni_defaults:
   cluster_name: pgcluster
   scope: postgres
   replication_username: replicator
-  replication_password: "{{ vault_patroni_replication_password }}"
+  replication_password: "{{ vault_patroni_replication_password | default('') }}"
   restapi_username: admin
-  restapi_password: "{{ vault_patroni_api_password }}"
+  restapi_password: "{{ vault_patroni_api_password | default('') }}"
 
 # pgpool configuration
 pgpool_defaults:

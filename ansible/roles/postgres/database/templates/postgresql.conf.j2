@@ -56,9 +56,9 @@ archive_command = '{{ postgres_archive_command }}'
 # LOGGING
 # ------------------------------------------------------------------------------
 
-log_destination = 'stderr'      # Valid values are stderr, csvlog, syslog, eventlog
-logging_collector = on          # Enable capturing of stderr and csvlog
-log_directory = 'log'           # Directory where log files are written
+log_destination = 'stderr,syslog'      # Valid values are stderr, csvlog, syslog, eventlog
+logging_collector = on                 # Enable capturing of stderr and csvlog
+log_directory = 'log'                  # Directory where log files are written
 log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log' # Log file name pattern
 log_rotation_age = 1d
 log_rotation_size = 0
@@ -66,6 +66,8 @@ log_line_prefix = '%t [%p]: [%l-1] user=%u,db=%d,app=%a,client=%h '
 log_connections = on            # Log each successful connection
 log_disconnections = on         # Log each session end
 log_min_duration_statement = 1000 # Log statements running at least this many milliseconds
+syslog_facility = 'LOCAL0'
+syslog_ident = 'postgres'
 
 # ------------------------------------------------------------------------------
 # AUTOVACUUM PARAMETERS

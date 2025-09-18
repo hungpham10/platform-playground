@@ -2,8 +2,8 @@
 - name: Verify system requirements
   assert:
     that:
-      - ansible_memtotal_mb >= 4096
-      - ansible_processor_vcpus >= 2
+      - ansible_memtotal_mb >= (postgres_memory_requirement | default(4096))
+      - ansible_processor_vcpus >= (postgres_cpu_requirement | default(2))
     fail_msg: "Host does not meet PostgreSQL requirements"
 
 - name: Create PostgreSQL directories

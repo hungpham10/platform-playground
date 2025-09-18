@@ -1,6 +1,4 @@
 # DHCP configuration
-dhcp_enabled: true
-
 dhcp_configs:
   mode: server
   enable_auto_provision: true

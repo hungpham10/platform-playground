@@ -1,0 +1,13 @@
+internal_subnets: []
+# - "10.0.1.0/24"
+
+internal_zones: []
+# - name: "dynamic.services."
+#
+# @NOTE: use forwarder
+#   forwarders:
+#     - "10.1.0.20"
+#
+# @NOTE: or use database
+#   database: "/var/lib/named/dynamic.service.db"
+internet_dns_resolvers: []

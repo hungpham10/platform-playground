@@ -1,6 +1,6 @@
 ---
 # Audit configuration
-audit_rules:
+audit_default_rules:
   # System calls
   - "-a exit,always -F arch=b64 -S execve -k exec"
   - "-a exit,always -F arch=b64 -S open,openat -F auid>=1000 -F auid!=4294967295 -k access"

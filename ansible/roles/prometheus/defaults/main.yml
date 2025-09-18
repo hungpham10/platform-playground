@@ -1,0 +1,2 @@
+prometheus_user: "prometheus"
+prometheus_group: "prometheus"

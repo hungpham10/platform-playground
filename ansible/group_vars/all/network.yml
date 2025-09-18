@@ -1,5 +1,5 @@
 ---
-# Default network configuration
+# Example of network configuration
 network_defaults:
   is_gateway_machine: false
   enable_forwarding: false
@@ -7,32 +7,24 @@ network_defaults:
   dhcp_mode: "client"
   ntp_mode: "client"
   vpn_mode: "client"
-  domain: "example.com"
-  net: "local"
 
-# Default interfaces
-network_interfaces:
-  - name: eth0
-    type: ethernet
-    dhcp: false
-    addresses:
-      - "{{ ansible_host }}/24"
-    gateway: "192.168.1.1"
-    nameservers:
-      addresses: ["8.8.8.8", "8.8.4.4"]
-
-# Default firewall rules
-firewall_rules:
-  tcp_ports:
-    - port: 22
-      comment: "SSH"
-  udp_ports: []
+# Example of interfaces
+#network_interfaces:
+#  - name: eth0
+#    type: ethernet
+#    dhcp: false
+#    addresses:
+#      - "{{ ansible_host }}/24"
+#    gateway: "192.168.1.1"
+#    nameservers:
+#      addresses: ["8.8.8.8", "8.8.4.4"]
 
 # Example cluster nodes configuration
-cluster_nodes:
-  - hostname: "master01"
-    ip: "192.168.1.10"
-  - hostname: "worker01" 
-    ip: "192.168.1.11"
-  - hostname: "worker02"
-    ip: "192.168.1.12"
+#cluster_nodes:
+#  - hostname: "master01"
+#    ip: "192.168.1.10"
+#  - hostname: "worker01" 
+#    ip: "192.168.1.11"
+#  - hostname: "worker02"
+#    ip: "192.168.1.12"
+

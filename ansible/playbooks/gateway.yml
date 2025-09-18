@@ -2,11 +2,22 @@
 - import_playbook: boilerplate.yml
 
 - name: Configure Gateway Instance
-  hosts: gateway-*
+  hosts: gateway
   become: true
   vars:
     instance_role: gateway
   roles:
+    # @NOTE: setup blackbox
+    - role: blackbox
+      when: (instance_role == 'gateway') and (lighthouse_enabled | default(false))
+      tags: ["monitor"]
+
+    # @NOTE: setup prometheus
+    - role: prometheus
+      when: (instance_role == 'gateway') and (lighthouse_enabled | default(false))
+      tags: ["monitor"]
+
+    # @NOTE: setup suricata
     - role: suricata
       vars:
         suricata_home_net: >-
@@ -16,13 +27,26 @@
           }}
         suricata_interfaces: >-
           {{ network_interfaces }}
-      when: instance_role == 'gateway'
+      when: (instance_role == 'gateway') and (suricate_enabled | default(false))
       tags: ["security", "ids"]
+
+    # @NOTE: setup digirunner
+    - role: digirunner
+      when: (instance_role == 'gateway') and (digirunner_enabled | default(false))
+      tags: ["gateway"]
+
+    # @NOTE: setup bind
+    - role: bind
+      vars:
+        internal_zones: "{{ bind_configs.zones }}"
+        internal_subnets: "{{ bind_configs.subnets }}"
+        internet_dns_resolvers: "{{ bind_configs.nameservers }}"
+      when: (instance_role == 'gateway') and (dns_enabled | default(false))
+      tags: ["network", "dns"]
 
     # @NOTE: setup matchbox
     - role: matchbox
-      when:
-        - instance_role == 'gateway' 
+      when: (instance_role == 'gateway') and (matchbox_enabled | default(false))
       tags: ["network", "matchbox"]
 
     # @NOTE: setup tftp
@@ -30,7 +54,7 @@
       vars:
         tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
         boot_menu_items: "{{ pxe_menu_items | default([]) }}"
-      when: instance_role == 'gateway'
+      when: (instance_role == 'gateway') and (tftp_enabled | default(false))
       tags: ["network", "tftp"]
 
     # @NOTE: Setup ipvs to group tftp cluster

@@ -23,32 +23,32 @@ logrotate_global_options:
   - notifempty
 
 # Default entries that will always be configured
-logrotate_default_entries:
-  - name: syslog
-    path: /var/log/syslog
-    frequency: daily
-    options:
-      - rotate 7
-      - daily
-      - missingok
-      - notifempty
-      - compress
-      - delaycompress
-      - sharedscripts
-    create: "0640 root adm"
-    postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
+logrotate_default_entries: []
+  #- name: syslog
+  #  path: /var/log/syslog
+  #  frequency: daily
+  #  options:
+  #    - rotate 7
+  #    - daily
+  #    - missingok
+  #    - notifempty
+  #    - compress
+  #    - delaycompress
+  #    - sharedscripts
+  #  create: "0640 root adm"
+  #  postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
 
-  - name: audit
-    path: /var/log/audit/audit.log
-    options:
-      - rotate 7
-      - weekly
-      - size 100M
-      - missingok
-      - notifempty
-      - compress
-      - delaycompress
-    create: "0640 root root"
+  #- name: audit
+  #  path: /var/log/audit/audit.log
+  #  options:
+  #    - rotate 7
+  #    - weekly
+  #    - size 100M
+  #    - missingok
+  #    - notifempty
+  #    - compress
+  #    - delaycompress
+  #  create: "0640 root root"
 
 # User-defined entries (empty by default)
 logrotate_custom_entries: []

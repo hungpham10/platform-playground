@@ -1,0 +1,21 @@
+[Unit]
+Description=DigiRunner Service
+After=network.target
+
+[Service]
+User=digirunner
+Group=digirunner
+WorkingDirectory=/opt/digirunner
+ExecStart=/usr/bin/java \
+    -Xms{{ digirunner_memory_request }} \
+    -Xmx{{ digirunner_memory_limit }} \
+    -cp /opt/digirunner/digirunner.jar \
+    -DdigiRunner.token.key-store.path=/opt/digirunner/keys \
+    -Dserver.port={{ digirunner_server_port }} \
+    org.springframework.boot.loader.launch.PropertiesLauncher
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

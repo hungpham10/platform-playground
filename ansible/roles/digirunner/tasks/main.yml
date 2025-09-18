@@ -1,0 +1,79 @@
+
+- name: Create folder to setup digirunner
+  file:
+    path: /opt/digirunner
+    state: directory
+    mode: '0755'
+
+- name: Create folder to store digirunner's config
+  file:
+    path: /opt/digirunner/config
+    state: directory
+    mode: '0755'
+
+- name: Create folder to store digirunner after unarchiving
+  file:
+    path: /tmp/digirunner
+    state: directory
+    mode: '0755'
+
+- name: Download h2-pack.zip from digirunner repository
+  get_url:
+    url: "https://github.com/TPIsoftwareOSPO/digiRunner-Open-Source/releases/download/{{ digirunner_version }}/h2-pack.zip"
+    dest: /tmp/h2-pack.zip
+    mode: '0644'
+
+- name: Unarchive h2-pack.zip
+  unarchive:
+    src: /tmp/h2-pack.zip
+    dest: /tmp/digirunner/
+    remote_src: yes
+
+- name: Render application.properties
+  template:
+    src: application.properties.j2
+    dest: /opt/digirunner/config/application.properties
+    mode: '0644'
+
+- name: Copy libraries from /tmp/digirunner/lib to /opt/digirunner
+  copy:
+    src: /tmp/digirunner/h2-pack/lib/
+    dest: /opt/digirunner/
+    remote_src: yes
+
+- name: Copy libraries from /tmp/digirunner/digirunner.jar to /opt/digirunner
+  copy:
+    src: /tmp/digirunner/h2-pack/digirunner.jar
+    dest: /opt/digirunner/digirunner.jar
+    remote_src: yes
+
+- name: Copy libraries from /tmp/digirunner/keys to /opt/digirunner
+  copy:
+    src: /tmp/digirunner/h2-pack/keys
+    dest: /opt/digirunner/
+    remote_src: yes
+
+- name: Create Digirunner systemd service
+  template:
+    src: digirunner.service.j2
+    dest: /etc/systemd/system/digirunner.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: yes
+
+- name: Ensure Digirunner service is started and enabled
+  systemd:
+    name: digirunner
+    state: started
+    enabled: yes
+    daemon_reload: yes
+  become: yes
+  register: service_result
+  failed_when: service_result.state != "started"
+  notify: Restart Digirunner
+
+- name: Remove file zip
+  file:
+    path: /tmp/h2-pack.zip
+    state: absent

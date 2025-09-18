@@ -1,0 +1,15 @@
+[Unit]
+Description=Blackbox Exporter
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ blackbox_exporter_user }}
+Group={{ blackbox_exporter_group }}
+Type=simple
+ExecStart=/usr/bin/blackbox_exporter --config.file={{ blackbox_exporter_config_path }}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

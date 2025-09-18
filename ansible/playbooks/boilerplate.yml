@@ -14,6 +14,21 @@
         - "../group_vars/{{ instance_role }}"
       tags: ["always"]
 
+    - name: Extend existing firewall rules with defaults
+      set_fact:
+        firewall_rules:
+          tcp_ports: "{{ (firewall_rules | default({})).get('tcp_ports', []) + firewall_default_rules.tcp_ports }}"
+          udp_ports: "{{ (firewall_rules | default({})).get('udp_ports', []) + firewall_default_rules.udp_ports }}"
+          custom: "{{ (firewall_rules | default({})).get('custom', []) + firewall_default_rules.custom }}"
+
+    - name: Extend existing audit rules with defaults
+      set_fact:
+        audit_rules: "{{ (audit_rules | default([])) + audit_default_rules }}"
+
+    - name: Extend existing role rules with defaults
+      set_fact:
+        audit_rules: "{{ (audit_rules | default([])) + audit_default_rules }}"
+
     - name: Check if host_vars directory exists
       stat:
         path: "host_vars/{{ inventory_hostname }}"
@@ -50,25 +65,41 @@
         linux_add_packages_keys: >-
           {{
             (base_package_keys | default([])) +
-            (role_package_keys[instance_role] | default([])) +
+            (
+              (role_package_keys[subdomain_instance_role] | default([]))
+              if instance_role == "gateway"
+              else (role_package_keys[instance_role] | default([]))
+            ) +
             (host_package_keys | default([]))
           }}
         linux_add_packages_repositories: >-
           {{
             (base_package_repos | default([])) +
-            (role_package_repos[instance_role] | default([])) +
+            (
+              (role_package_repos[subdomain_instance_role] | default([]))
+              if instance_role == "gateway"
+              else (role_package_repos[instance_role] | default([]))
+            ) +
             (host_package_repos | default([]))
           }}
         linux_add_packages_names: >-
           {{
             (base_packages | default([])) +
-            (role_packages[instance_role] | default([])) +
+            (
+              (role_packages[subdomain_instance_role] | default([]))
+              if instance_role == "gateway"
+              else (role_packages[instance_role] | default([]))
+            ) +
             (host_specific_packages | default([]))
           }}
         linux_add_public_signing_keys: >-
           {{
             (base_public_signing_keys | default([])) +
-            (role_public_signing_keys[instance_role] | default([])) +
+            (
+              (role_public_signing_keys[subdomain_instance_role] | default([]))
+              if instance_role == "gateway"
+              else (role_public_signing_keys[instance_role] | default([]))
+            ) +
             (host_public_signing_keys | default([]))
           }}
       tags: ["system", "packages"]
@@ -97,9 +128,7 @@
         dhcp_defaults: "{{ dhcp_configs }}"
         dhcp_enable_auto_provision: "{{ dhcp_configs.enable_auto_provision | default(false) }}"
         dhcp_provision_playbook: "{{ playbook_dir }}/site.yml"
-      when:
-        - dhcp_enabled | bool 
-        - dhcp_configs | default([]) | length > 0
+      when: (dhcp_enabled | default(false) | bool) and (dhcp_configs | default([]) | length > 0)
       tags: ["network", "dhcp"]
 
     - role: firewall
@@ -118,9 +147,7 @@
         vpn_server_endpoint: "{{ vpn_defaults.server_endpoint }}"
         wg_client_address: "{{ vpn_defaults.client_address }}"
         wg_allowed_ips: "{{ vpn_defaults.allowed_ips }}"
-      when: 
-        - enable_vpn | bool
-        - instance_role != 'gateway'
+      when: (enable_vpn | bool) and (instance_role != 'gateway')
       tags: ["security", "vpn"]
 
     - role: vpn
@@ -129,9 +156,7 @@
         vpn_server_endpoint: "{{ vpn_defaults.server_endpoint }}"
         wg_client_address: "{{ vpn_defaults.client_address }}"
         wg_allowed_ips: "{{ vpn_defaults.allowed_ips }}"
-      when: 
-        - enable_vpn | bool
-        - instance_role == 'gateway'
+      when: (enable_vpn | bool) and (instance_role == 'gateway')
       tags: ["security", "vpn"]
 
     - role: ntp
@@ -148,23 +173,23 @@
 
     - role: storage
       vars:
-        storage_devices: "{{ instance_storage_devices | default([]) }}"
-        storage_vgs: "{{ instance_storage_vgs | default([]) }}"
-        storage_lvs: "{{ instance_storage_lvs | default([]) }}"
+        storage_devices: "{{ instance_storage.devices | default([]) }}"
+        storage_vgs: "{{ instance_storage.vgs | default([]) }}"
+        storage_lvs: "{{ instance_storage.lvs | default([]) }}"
       tags: ["storage"]
 
-    - role: audit
-      vars:
-        audit_rules: "{{ audit_rules | default([]) }}"
-        audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
-        audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
-        audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
-        audit_num_logs: "{{ audit_num_logs | default(5) }}"
-        audit_space_left: "{{ audit_space_left | default(75) }}"
-        audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
-        audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
-        audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
-      tags: ["security", "audit"]
+    #- role: audit
+    #  vars:
+    #    audit_rules: "{{ audit_rules | default([]) }}"
+    #    audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
+    #    audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
+    #    audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
+    #    audit_num_logs: "{{ audit_num_logs | default(5) }}"
+    #    audit_space_left: "{{ audit_space_left | default(75) }}"
+    #    audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
+    #    audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
+    #    audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
+    #  tags: ["security", "audit"]
 
     - role: users
       vars:
@@ -183,16 +208,16 @@
         user_password_salt: "{{ user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
       tags: ["system", "users", "security"]
 
-    - role: hardening
-      vars:
-        security_required_packages: "{{ security_packages | default([]) }}"
-        sysctl_security_params: "{{ sysctl_params | default([]) }}"
-        password_policies: "{{ password_default_policies | default([]) }}"
-        remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
-        enable_aide: "{{ enable_file_integrity | default(false) }}"
-        aide_rules: "{{ file_integrity_rules | default([]) }}"
-        audit_rules: "{{ system_audit_rules | default([]) }}"
-      tags: ["security", "hardening"]
+    #- role: hardening
+    #  vars:
+    #    security_required_packages: "{{ security_packages | default([]) }}"
+    #    sysctl_security_params: "{{ sysctl_params | default([]) }}"
+    #    password_policies: "{{ password_default_policies | default([]) }}"
+    #    remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
+    #    enable_aide: "{{ enable_file_integrity | default(false) }}"
+    #    aide_rules: "{{ file_integrity_rules | default([]) }}"
+    #    audit_rules: "{{ system_audit_rules | default([]) }}"
+    #  tags: ["security", "hardening"]
 
   post_tasks:
     - name: Verify all services are running

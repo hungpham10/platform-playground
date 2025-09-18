@@ -9,6 +9,14 @@ role_users:
       uid: 2004
       groups: ['matchbox']
       ssh_keys: []
+    - name: digirunner
+      gid: 2005
+      groups: ['digirunner']
+      ssh_keys: []
+    - name: blackbox
+      gid: 2006
+      groups: ['blackbox']
+      ssh_keys: []
 
 role_groups:
   gateway:
@@ -16,3 +24,7 @@ role_groups:
       gid: 2003
     - name: matchbox
       gid: 2004
+    - name: digirunner
+      gid: 2005
+    - name: blackbox
+      gid: 2006

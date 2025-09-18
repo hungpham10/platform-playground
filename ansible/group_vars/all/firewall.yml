@@ -3,7 +3,8 @@ firewall_defaults:
   state: enabled
   enabled: true
 
-firewall_rules:
+# Default firewall rules
+firewall_default_rules:
   tcp_ports:
     - port: 22    
       comment: "SSH"

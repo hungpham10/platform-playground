@@ -1,0 +1,35 @@
+global:
+  scrape_interval: {{ scrape_interval | default("15s") }}
+
+scrape_configs:
+{% for target in blackbox_targets %}
+  - job_name: '{{ target.name }}'
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets:
+{% for endpoint in target.endpoints %}
+        - {{ endpoint }}
+{% endfor %}
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: {{ target.ip }}:{{ target.port }}
+{% endfor %}
+
+  - job_name: 'local'
+    static_configs:
+      - targets:
+        - 127.0.0.1:9115
+
+{% if (remote_write | default('') | length) > 0 %}
+remote_write:
+  - url: {{ remote_write }}
+    write_relabel_configs:
+      - source_labels: [pushgateway_instance]
+        target_label: instance
+{% endif %}

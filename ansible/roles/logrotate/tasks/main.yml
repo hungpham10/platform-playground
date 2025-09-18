@@ -22,3 +22,18 @@
     loop_var: entry
   notify: Restart logrotate
 
+- name: Configure postgres logging
+  template:
+    src: rsyslog.conf.j2
+    dest: "/etc/rsyslog.d/{{ entry.rsyslog.id }}-{{ entry.rsyslog.program_name }}.conf"
+    mode: '0644'
+    owner: root
+    group: root
+  vars:
+    program_name: "{{ entry.rsyslog.program_name }}"
+    log_path: "{{ entry.path }}"
+  when: entry.rsyslog is defined
+  loop: "{{ logrotate_entries }}"
+  loop_control:
+    loop_var: entry
+  notify: Restart rsyslog

@@ -1,0 +1,61 @@
+---
+- name: Setup folders
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    mode: '0755'
+  loop:
+    - "{{ blackbox_exporter_config_path | dirname }}"
+
+- name: Download package
+  get_url:
+    url: "{{ blackbox_exporter_url }}"
+    dest: "/tmp/blackbox_exporter.tar.gz"
+    mode: '0644'
+
+- name: Unarchive package
+  unarchive:
+    src: "/tmp/blackbox_exporter.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+  register: unarchive_result
+
+- name: Copy binary to correct destination
+  copy:
+    src: "/tmp/blackbox_exporter-{{ blackbox_exporter_version }}.linux-{{ blackbox_exporter_arch }}/blackbox_exporter"
+    dest: "/usr/bin/blackbox_exporter"
+    owner: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    mode: '0755'
+    remote_src: yes
+
+- name: Render blackbox-exporter.yml
+  template:
+    src: blackbox-exporter.yml.j2
+    dest: "{{ blackbox_exporter_config_path }}"
+    owner: "{{ blackbox_exporter_user }}"
+    group: "{{ blackbox_exporter_group }}"
+    mode: '0644'
+
+- name: Render blackbox-exporter.service
+  template:
+    src: blackbox-exporter.service.j2
+    dest: /etc/systemd/system/blackbox-exporter.service
+    mode: '0644'
+  notify: Restart blackbox-exporter
+
+- name: Start and enable Blackbox Exporter service
+  systemd:
+    name: blackbox-exporter
+    state: started
+    enabled: yes
+
+- name: Verify Blackbox Exporter metrics endpoint
+  uri:
+    url: "http://localhost:9115/metrics"
+    method: GET
+    status_code: 200
+  register: blackbox_metrics
+  failed_when: blackbox_metrics.status != 200

@@ -1,0 +1,6 @@
+---
+- name: Restart Digirunner
+  ansible.builtin.systemd:
+    name: digirunner
+    state: restarted
+  become: yes

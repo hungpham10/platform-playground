@@ -52,10 +52,11 @@
         postgres_archive_dir: "{{ postgres_defaults.archive_dir }}"
       tags: ["database", "postgres"]
 
+    # Configure PostgreSQL logging
     - role: logrotate
       vars:
         logrotate_custom_entries:
-          - name: postgres
+          - name: postgres-for-analyse
             path: "/var/lib/postgresql/{{ postgres_defaults.version }}/main/log/*.log"
             frequency: daily
             options:
@@ -65,8 +66,25 @@
               - delaycompress
               - missingok
               - notifempty
+              - sharedscript
             create: "0640 postgres postgres"
             postrotate_script: "/usr/lib/postgresql/{{ postgres_defaults.version }}/bin/pg_ctl -D {{ postgres_defaults.data_dir }} reload"
+          - name: postgres-for-storing
+            path: "/var/log/postgres.log"
+            frequency: daily
+            options:
+              - rotate 7
+              - daily
+              - missingok
+              - notifempty
+              - compress
+              - delaycompress
+              - sharedscripts
+            rsyslog: 
+              program_name: postgres
+              id: 30
+            create: "0640 root adm"
+            postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
       tags: ["monitoring"]
 
     # PostgreSQL analysis and monitoring

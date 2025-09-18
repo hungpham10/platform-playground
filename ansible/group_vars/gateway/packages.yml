@@ -1,21 +1,29 @@
 ---
-role_package_keys:
-  gateway:
-    - https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x121504ADE276E141AD704A75AC10378CF205C960
-
-role_package_repos:
-  gateway:
-    - ppa:oisf/suricata-stable
-
 role_packages:
-  gateway:
+  waf:
     - aide
     - wireguard
+    - iptables
+    - suricata
+  bootload:
+    - aide
     - iptables
     - isc-dhcp-server
     - tftpd-hpa
     - pxelinux
     - syslinux-common
-    - suricata
     - cd-boot-images-arm64
     - cd-boot-images-amd64
+  digirunner:
+    - zip
+    - openjdk-11-jdk
+  lighthouse:
+    - prometheus
+
+role_package_keys:
+  waf:
+    - https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x121504ADE276E141AD704A75AC10378CF205C960
+
+role_package_repos:
+  waf:
+    - ppa:oisf/suricata-stable
