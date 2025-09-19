@@ -1,29 +1,58 @@
 ---
 role_packages:
   waf:
-    - aide
-    - wireguard
-    - iptables
-    - suricata
+    yum:
+      - aide
+      - wireguard-tools
+      - iptables
+      - suricata
+    apt:
+      - aide
+      - wireguard
+      - iptables
+      - suricata
   bootload:
-    - aide
-    - iptables
-    - isc-dhcp-server
-    - tftpd-hpa
-    - pxelinux
-    - syslinux-common
-    - cd-boot-images-arm64
-    - cd-boot-images-amd64
+    yum:
+      - aide
+      - iptables
+      - dhcp-server
+      - tftp-server
+      - syslinux
+      - syslinux-tftpboot
+    apt:
+      - aide
+      - iptables
+      - isc-dhcp-server
+      - tftpd-hpa
+      - pxelinux
+      - syslinux-common
+      - cd-boot-images-arm64
+      - cd-boot-images-amd64
   digirunner:
-    - zip
-    - openjdk-11-jdk
+    yum:
+      - zip
+      - java-11-openjdk-devel
+    apt:
+      - zip
+      - openjdk-11-jdk
   lighthouse:
-    - prometheus
+    yum: []
+    apt: []
 
 role_package_keys:
   waf:
-    - https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x121504ADE276E141AD704A75AC10378CF205C960
+    yum: []
+    apt:
+      - https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x121504ADE276E141AD704A75AC10378CF205C960
 
 role_package_repos:
   waf:
-    - ppa:oisf/suricata-stable
+    yum:
+      - name: suricata
+        description: Suricata IDS/IPS
+        baseurl: https://packages.suricata.io/enterprise/centos/$releasever/$basearch/
+        gpgkey: https://packages.suricata.io/suricata-io-rpm.asc
+        gpgcheck: yes
+        enabled: yes
+    apt:
+      - ppa:oisf/suricata-stable

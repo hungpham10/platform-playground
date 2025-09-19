@@ -1,0 +1,21 @@
+# Các DNS servers chính
+primary_dns_servers:
+  - "8.8.8.8"
+  - "8.8.4.4"
+  - "1.1.1.1"
+
+# Các DNS servers dự phòng
+fallback_dns_servers:
+  - "1.0.0.1"
+  - "208.67.222.222"
+  - "208.67.220.220"
+
+# Các domain search
+dns_search_domains:
+  - "localdomain"
+
+# Cấu hình DNS-over-TLS
+dns_over_tls: "opportunistic"
+
+# DNS cache settings
+dns_cache_size: "0"  # 0 means default (cache disabled)

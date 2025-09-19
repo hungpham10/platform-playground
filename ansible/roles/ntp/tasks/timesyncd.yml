@@ -1,0 +1,20 @@
+---
+- name: Configure systemd-timesyncd
+  template:
+    src: timesyncd.conf.j2
+    dest: /etc/systemd/timesyncd.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: restart timesyncd
+
+- name: Enable and start systemd-timesyncd
+  systemd:
+    name: systemd-timesyncd
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Set timezone
+  timezone:
+    name: "{{ ntp_timezone | default('UTC') }}"

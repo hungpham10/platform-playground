@@ -1,0 +1,113 @@
+- name: Set OS family facts
+  set_fact:
+    is_debian_based: "{{ ansible_os_family == 'Debian' }}"
+    is_redhat_based: "{{ ansible_os_family == 'RedHat' }}"
+
+- name: Configure yum repository on RedHat-based systems
+  become: true
+  template:
+    src: "{{ item.src }}"
+    dest: "/etc/yum.repos.d/{{ item.dest }}"
+    backup: yes
+  with_items: "{{ redhat_yum_repos | default([]) }}"
+  run_once: true
+  when:
+    - redhat_yum_repos is defined
+    - is_redhat_based
+  register: replace_redhat_yum_config
+
+- name: Clean yum cache on RedHat-based systems
+  become: true
+  command: yum clean all
+  run_once: true
+  when:
+    - replace_redhat_yum_config.changed
+    - is_redhat_based
+
+- name: YUM | Import GPG keys
+  rpm_key:
+    key: "{{ item }}"
+    state: present
+  with_items: "{{ linux_add_packages_keys | default([]) }}"
+  when:
+    - is_redhat_based
+    - linux_add_packages_keys | default([]) | length > 0
+  register: yumnewkeys
+  retries: 3
+  delay: 10
+  until: yumnewkeys is success
+
+- name: YUM | Add new repositories
+  yum_repository:
+    name: "{{ item.name }}"
+    description: "{{ item.description | default('Custom repository') }}"
+    baseurl: "{{ item.baseurl }}"
+    gpgcheck: "{{ item.gpgcheck | default('yes') }}"
+    gpgkey: "{{ item.gpgkey | default(omit) }}"
+    enabled: "{{ item.enabled | default('yes') }}"
+    state: present
+  with_items: "{{ linux_add_packages_repositories | default([]) }}"
+  when:
+    - is_redhat_based
+  register: result
+  until: result is success
+
+- name: YUM | Clean metadata cache after repository changes
+  command: yum clean metadata
+  when:
+    - is_redhat_based
+    - result.changed or yumnewkeys.changed
+
+- name: YUM | Make cache after repository changes
+  command: yum makecache
+  when:
+    - is_redhat_based
+    - result.changed or yumnewkeys.changed
+
+- name: Set default value for cache behavior
+  set_fact:
+    yum_update_cache: "no"
+
+- name: YUM | Force cache update if new keys or repos added
+  set_fact:
+    yum_update_cache: "yes"
+  when: result.changed or yumnewkeys.changed
+
+- name: YUM | Remove packages
+  yum:
+    name: "{{ item }}"
+    state: absent
+  ignore_errors: true
+  with_items: "{{ linux_remove_packages_names }}"
+  when:
+    - is_redhat_based
+    - linux_remove_packages_names | default([]) | length > 0
+
+- name: YUM | Install packages
+  yum:
+    name: "{{ item }}"
+    state: present
+    update_cache: "{{ yum_update_cache }}"
+  register: result
+  retries: 3
+  delay: 10
+  until: result is success
+  with_items: "{{ linux_add_packages_names }}"
+  when:
+    - is_redhat_based
+    - linux_add_packages_names | default([]) | length > 0
+
+- name: YUM | Install packages with dnf if available (for newer versions)
+  dnf:
+    name: "{{ item }}"
+    state: present
+    update_cache: "{{ yum_update_cache }}"
+  register: result
+  retries: 3
+  delay: 10
+  until: result is success
+  with_items: "{{ linux_add_packages_names }}"
+  when:
+    - is_redhat_based
+    - ansible_pkg_mgr == "dnf"
+    - linux_add_packages_names | default([]) | length > 0

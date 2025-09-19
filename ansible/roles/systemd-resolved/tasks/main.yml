@@ -1,0 +1,46 @@
+- name: Render resolved.conf
+  template:
+    src: resolved.conf.j2
+    dest: /etc/systemd/resolved.conf
+    mode: '0644'
+  notify: restart systemd-resolved
+
+- name: Replace /etc/resolv.conf with symlink to systemd-resolved's stub resolver
+  file:
+    path: /etc/resolv.conf
+    state: link
+    force: yes
+    src: /run/systemd/resolve/stub-resolv.conf
+  when: ansible_os_family == "Debian"
+
+- name: Enable and start systemd-resolved service
+  systemd:
+    name: systemd-resolved
+    enabled: yes
+    state: started
+    daemon_reload: yes
+  when: ansible_os_family == "Debian"
+
+- name: Test DNS resolution
+  command: dig google.com
+  register: dns_test
+  changed_when: false
+  when: ansible_os_family == "Debian"
+
+- name: Create custom resolv.conf to prevent overwrites
+  copy:
+    content: |
+      # Ansible managed - DO NOT EDIT MANUALLY
+      {% for server in primary_dns_servers %}
+      nameserver {{ server }}
+      {% endfor %}
+      options rotate timeout:1 attempts:2
+    dest: /etc/resolv.conf
+    owner: root
+    group: root
+    mode: '0644'
+  when: ansible_os_family == "RedHat"
+
+- name: Make resolv.conf immutable to prevent changes
+  command: chattr +i /etc/resolv.conf
+  when: ansible_os_family == "RedHat"

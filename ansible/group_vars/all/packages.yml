@@ -1,16 +1,30 @@
 ---
 # Base package configuration
-base_package_keys: []
+base_package_keys:
+  apt: []
+  yum: []
 
-base_package_repos: []
+base_package_repos:
+  apt: []
+  yum: []
 
 base_packages:
-  - acl
-  - ufw
-  - gpg
-  - auditd
-  - lvm2
-  - xfsprogs
-  - e2fsprogs
-  - parted
-  - btrfs-progs
+  apt:
+    - acl
+    - ufw
+    - gpg
+    - auditd
+    - lvm2
+    - xfsprogs
+    - e2fsprogs
+    - parted
+    - btrfs-progs
+  yum:
+    - acl
+    - firewalld          # Tương đương ufw
+    - gnupg2             # Tương đương gpg
+    - audit              # Tương đương auditd
+    - lvm2
+    - xfsprogs
+    - e2fsprogs
+    - parted

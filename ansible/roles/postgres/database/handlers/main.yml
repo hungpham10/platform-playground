@@ -1,7 +1,7 @@
 ---
 - name: restart postgresql
   systemd:
-    name: "{{ postgres_service }}"
+    name: "{{ postgres_service }}@{{ postgres_version }}-main"
     state: restarted
 
 - name: daemon reload

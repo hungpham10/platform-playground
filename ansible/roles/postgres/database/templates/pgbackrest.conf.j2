@@ -11,7 +11,7 @@ delta=y
 pg1-path={{ postgres_data_dir }}
 pg1-socket-path=/var/run/postgresql
 {% if postgres_replication_role == 'standby' %}
-pg1-host={{ groups['postgres_master'][0] }}
+pg1-host={{ hostvars[groups['postgres-master'][0]]['ansible_host']  }}
 pg1-host-user=postgres
 pg1-host-type=replica
 {% endif %}

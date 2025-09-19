@@ -1,0 +1,83 @@
+---
+- name: Get current firewall state
+  command: firewall-cmd --state
+  register: firewall_state
+  changed_when: false
+  ignore_errors: true
+
+- name: Ensure firewalld service is running and enabled
+  systemd:
+    name: firewalld
+    state: started
+    enabled: "{{ firewall_defaults.state == 'enabled' }}"
+  when: firewall_enabled
+
+- name: Reset firewalld to default state (if not active)
+  command: firewall-cmd --reload
+  when: 
+    - firewall_enabled
+    - firewall_state.stdout != "running"
+
+- name: Set default zone to public with DENY policy
+  firewalld:
+    zone: public
+    target: "{{ 'DROP' if firewall_policy == 'DENY' else 'ACCEPT' }}"
+    permanent: yes
+    state: enabled
+  when: firewall_enabled
+
+- name: Configure allowed TCP ports
+  firewalld:
+    zone: public
+    port: "{{ item.port }}/tcp"
+    permanent: yes
+    state: enabled
+  loop: "{{ firewall_rules.tcp_ports | default([]) }}"
+  when: 
+    - firewall_enabled
+    - firewall_rules.tcp_ports is defined
+
+- name: Configure allowed UDP ports
+  firewalld:
+    zone: public
+    port: "{{ item.port }}/udp"
+    permanent: yes
+    state: enabled
+  loop: "{{ firewall_rules.udp_ports | default([]) }}"
+  when:
+    - firewall_enabled
+    - firewall_rules.udp_ports is defined
+
+- name: Configure allowed services (for better readability)
+  firewalld:
+    zone: public
+    service: "{{ item.service }}"
+    permanent: yes
+    state: enabled
+  loop: "{{ firewall_rules.tcp_ports | default([]) | map('attribute', 'port') | list | service_mapping }}"
+  when: 
+    - firewall_enabled
+    - firewall_rules.tcp_ports is defined
+
+- name: Apply custom firewall rules (rich rules)
+  firewalld:
+    zone: public
+    rich_rule: "{{ item.rich_rule }}"
+    permanent: yes
+    state: enabled
+  loop: "{{ firewall_rules.custom | default([]) }}"
+  when:
+    - firewall_enabled
+    - firewall_rules.custom is defined
+
+- name: Configure firewall logging
+  firewalld:
+    zone: public
+    log_denied: "{{ 'all' if firewall_log_dropped_packets | default(false) | bool else 'off' }}"
+    permanent: yes
+    state: enabled
+  when: firewall_enabled
+
+- name: Reload firewalld to apply all changes
+  command: firewall-cmd --reload
+  when: firewall_enabled

@@ -1,61 +1,13 @@
 ---
-- name: Get current firewall state
-  command: ufw status verbose
-  register: ufw_status
-  changed_when: false
+- name: Set OS family facts
+  set_fact:
+    is_debian_based: "{{ ansible_os_family == 'Debian' }}"
+    is_redhat_based: "{{ ansible_os_family == 'RedHat' }}"
 
-- name: Reset ufw to default state
-  ufw:
-    state: reset
-  when: 
-    - firewall_enabled
-    - "not 'Status: active' in ufw_status.stdout"
+- name: Configure firewall for Debian base
+  include_tasks: ufw.yml
+  when: is_debian_based
 
-- name: Set firewall policy
-  ufw:
-    state: "{{ firewall_defaults.state }}"
-    default: "{{ firewall_policy }}"
-  when: 
-    - firewall_enabled
-    - "not 'Default: ' + firewall_policy in ufw_status.stdout"
-
-- name: Configure allowed TCP ports
-  ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: tcp
-    comment: "{{ item.comment | default(omit) }}"
-  loop: "{{ firewall_rules.tcp_ports | default([]) }}"
-  when: 
-    - firewall_enabled
-    - firewall_rules.tcp_ports is defined
-
-- name: Configure allowed UDP ports
-  ufw:
-    rule: allow
-    port: "{{ item.port }}"
-    proto: udp
-    comment: "{{ item.comment | default(omit) }}"
-  loop: "{{ firewall_rules.udp_ports | default([]) }}"
-  when:
-    - firewall_enabled
-    - firewall_rules.udp_ports is defined
-
-- name: Apply custom firewall rules
-  ufw:
-    rule: "{{ item.rule | default('allow') }}"
-    port: "{{ item.port | default(omit) }}"
-    proto: "{{ item.proto | default(omit) }}"
-    src: "{{ item.src | default(omit) }}"
-    dst: "{{ item.dst | default(omit) }}"
-  loop: "{{ firewall_rules.custom | default([]) }}"
-  when:
-    - firewall_enabled
-    - firewall_rules.custom is defined
-
-- name: Enable logging
-  ufw:
-    logging: on
-  when: 
-    - firewall_enabled
-    - firewall_log_dropped_packets | default("true") | bool
+- name: Configure firewall for RedHat base
+  include_tasks: firewald.yml
+  when: is_redhat_based

@@ -1,4 +1,25 @@
 ---
+- name: Ensure / has correct permissions
+  file:
+    path: /
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure /var has correct permissions
+  file:
+    path: /var
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Ensure /var/log has correct permissions
+  file:
+    path: /var/log
+    owner: root
+    group: root
+    mode: "0755"
+
 - name: Configure logrotate global settings
   template:
     src: "logrotate.conf.j2"

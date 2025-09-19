@@ -1,0 +1,180 @@
+---
+# Default variables for YUM/DNF package management role
+
+# OS family detection
+ansible_os_family: "{{ ansible_facts['os_family'] }}"
+
+# Package management variables
+linux_remove_packages_names: []
+linux_add_packages_names: []
+
+# Repository management
+linux_add_packages_repositories: []
+linux_add_packages_keys: []
+
+# Custom repository files configuration
+redhat_yum_repos: []
+
+# Repository configuration templates
+redhat_yum_repo_configs:
+  #- name: custom-repo
+  #  description: Custom Repository
+  #  baseurl: ""
+  #  mirrorlist: ""
+  #  gpgcheck: yes
+  #  gpgkey: ""
+  #  enabled: yes
+  #  state: present
+  #  priority: 99
+
+# GPG key management
+linux_add_packages_rpm_keys: []
+
+# Cache settings
+yum_update_cache: "no"
+yum_clean_metadata: "no"
+
+# Default mirror URLs
+default_centos_mirror: "http://mirror.centos.org/centos"
+default_epel_mirror: "https://download.fedoraproject.org/pub/epel"
+
+# EL version mapping
+el_version: "{{ ansible_distribution_major_version }}"
+el_architecture: "{{ ansible_architecture }}"
+
+# EPEL repository configuration
+enable_epel_repo: yes
+epel_repo_url: "https://download.fedoraproject.org/pub/epel/epel-release-latest-{{ el_version }}.noarch.rpm"
+
+# Package manager selection
+preferred_package_manager: "auto"  # auto, yum, dnf
+
+# Security settings
+gpgcheck: yes
+repo_gpgcheck: no
+sslverify: yes
+
+# Retry settings for package operations
+package_retries: 3
+package_delay: 10
+
+# Cleanup settings
+cleanup_package_cache: yes
+remove_orphaned_packages: no
+clean_old_kernels: yes
+
+# Repository priorities
+repository_priority: 99
+
+# Proxy settings
+yum_proxy: undefined
+yum_proxy_username: undefined
+yum_proxy_password: undefined
+
+# SSL settings
+yum_ssl_verify: yes
+yum_ssl_cert: undefined
+yum_ssl_key: undefined
+yum_ssl_ca_cert: undefined
+
+# Architecture specific settings
+package_architecture: "{{ ansible_architecture }}"
+
+# Development packages
+install_devel_packages: no
+install_weak_deps: yes  # For dnf
+
+# Version pinning
+package_version_pinning: no
+default_package_version: "latest"
+
+# Debug settings
+yum_debug: no
+verbose_package_operations: no
+
+# Timeout settings
+package_download_timeout: 300
+package_install_timeout: 1800
+
+# Repository signing key settings
+key_import_timeout: 120
+key_validation: yes
+
+# Repository metadata settings
+metadata_expire: 21600  # 6 hours
+metadata_threads: 1
+
+# Kernel management
+keep_kernel_devel: yes
+keep_last_kernel: 3
+
+# DNF specific settings
+dnf_best: yes
+dnf_skip_broken: no
+dnf_clean_requirements_on_remove: yes
+dnf_install_weak_deps: yes
+
+# YUM specific settings
+yum_check_update: no
+yum_disablerepo: undefined
+yum_enablerepo: undefined
+yum_exclude: undefined
+
+# Group package management
+yum_groups: []
+dnf_groups: []
+
+# Module management (for DNF)
+dnf_modules: []
+
+# Security update settings
+security_updates_only: no
+enable_security_repos: yes
+
+# Repository mirror selection
+auto_select_fastest_mirror: no
+mirror_protocol: "http"  # http, https
+
+# Local repository settings
+enable_local_repos: no
+local_repo_path: "/opt/local-repos"
+
+# Repository states
+repo_state_present: "present"
+repo_state_absent: "absent"
+
+# Package states
+package_state_present: "present"
+package_state_latest: "latest"
+package_state_absent: "absent"
+
+# GPG key states
+gpg_key_state_present: "present"
+gpg_key_state_absent: "absent"
+
+# Default package options
+yum_options: ""
+dnf_options: ""
+
+# Transaction history settings
+keep_transaction_history: yes
+max_transaction_history: 10
+
+# Plugin settings
+enable_yum_plugins: yes
+enable_dnf_plugins: yes
+
+# Delta RPM settings
+enable_delta_rpm: yes
+download_delta_rpm: yes
+
+# Color settings
+yum_color: "auto"
+dnf_color: "auto"
+
+# Automatic update settings
+yum_autoupdate: no
+dnf_autoupdate: no
+
+# Cleanup requirements
+clean_requirements_on_remove: yes

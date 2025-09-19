@@ -14,6 +14,8 @@
     group: postgres
     mode: '0700'
   loop:
+    - "{{ postgres_config_path }}"
+    - "{{ postgres_config_path }}/conf.d"
     - "{{ postgres_data_dir }}"
     - "{{ postgres_backup_dir }}"
     - "{{ postgres_archive_dir }}"
@@ -30,6 +32,13 @@
     - { src: pg_hba.conf.j2, dest: "{{ postgres_config_path }}/pg_hba.conf" }
   notify: restart postgresql
 
+- name: Makesure that WAL level must support when setup cluster 
+  assert:
+    that:
+      - postgres_wal_level in ['replica', 'logical']
+  when: postgres_replication_role in ['master', 'standby']
+  notify: restart postgresql
+
 - name: Configure PostgreSQL replication
   template:
     src: postgresql.replication.conf.j2
@@ -40,25 +49,24 @@
   when: postgres_replication_role in ['master', 'standby']
   notify: restart postgresql
 
-- name: Configure recovery for standby
-  template:
-    src: recovery.conf.j2
-    dest: "{{ postgres_data_dir }}/recovery.conf"
+- name: Create standby.signal file
+  file:
+    path: "{{ postgres_data_dir }}/standby.signal"
+    state: touch
     owner: postgres
     group: postgres
-    mode: '0600'
+    mode: '0644'
   when: postgres_replication_role == 'standby'
-  notify: restart postgresql
 
 - name: Create replication slot on master
   postgresql_slot:
-    name: "{{ item }}_slot"
+    name: "{{ item | regex_replace('-', '_') }}_slot"
     slot_type: physical
     state: present
-  loop: "{{ groups['postgres_standby'] }}"
+  loop: "{{ groups['postgres-standby'] }}"
   when: 
     - postgres_replication_role == 'master'
-    - inventory_hostname == groups['postgres_master'][0]
+    - inventory_hostname == groups['postgres-master'][0]
   become: true
   become_user: postgres
 
@@ -70,10 +78,55 @@
     state: present
   when: 
     - postgres_replication_role == 'master'
-    - inventory_hostname == groups['postgres_master'][0]
+    - inventory_hostname == groups['postgres-master'][0]
   become: true
   become_user: postgres
   no_log: true
+
+- name: Set password for postgres user
+  postgresql_user:
+    name: postgres
+    password: "{{ postgres_admin_password }}"
+    state: present
+  become: true
+  become_user: postgres
+  no_log: true
+  when: 
+    - postgres_replication_role != 'standby'
+
+- name: Create PostgreSQL users
+  postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: "{{ item.flags | default('NOSUPERUSER,NOCREATEDB') }}"
+    state: present
+  loop: "{{ postgres_users | default([]) }}"
+  become: true
+  become_user: postgres
+  no_log: true
+  when: 
+    - postgres_replication_role != 'standby'
+
+- name: Create PostgreSQL databases
+  postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner }}"
+    encoding: "{{ item.encoding | default('UTF-8') }}"
+    template: "{{ item.template | default('template0') }}"
+    state: present
+  loop: "{{ postgres_databases | default([]) }}"
+  become: true
+  become_user: postgres
+- name: Check if replication slot is active
+  community.postgresql.postgresql_query:
+    db: postgres
+    login_user: postgres
+    login_host: "127.0.0.1" 
+    login_password: "{{ postgres_admin_password }}"
+    query: "SELECT active FROM pg_replication_slots WHERE slot_name = '{{ inventory_hostname | regex_replace('-', '_') }}_slot';"
+  register: slot_status
+  delegate_to: "{{ groups['postgres-master'][0] }}"
+  run_once: true
 
 - name: Setup base backup for standby
   block:
@@ -87,18 +140,21 @@
 
     - name: Take base backup from master
       command: >
-        pg_basebackup -h {{ groups['postgres_master'][0] }}
+        pg_basebackup -h {{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}
         -U {{ postgres_replication_user }}
         -D {{ postgres_data_dir }}
         -X stream
-        -S {{ inventory_hostname }}_slot
+        -S {{ inventory_hostname | regex_replace('-', '_') }}_slot
         -R
       become: true
       become_user: postgres
       environment:
-        PGPASSWORD: "{{ postgres_replication_password }}"
+        PGPASSWORD: "{{ postgres_replication_password | default ('123456') }}"
       when: postgres_replication_role == 'standby'
-  when: postgres_replication_role == 'standby'
+  when:
+    - postgres_replication_role == 'standby'
+    - slot_status.query_result[0].active is defined
+    - not slot_status.query_result[0].active
 
 - name: Create failover management scripts
   template:
@@ -115,13 +171,13 @@
 
 - name: Create systemd override directory
   file:
-    path: /etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d
+    path: "/etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d"
     state: directory
     mode: '0755'
 
 - name: Create override.conf for custom config path
   copy:
-    dest: /etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d/override.conf
+    dest: "/etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d/override.conf"
     content: |
       [Unit]
       AssertPathExists=/var/lib/postgresql/%I/postgresql.conf
@@ -134,42 +190,19 @@
 
 - name: Start and enable PostgreSQL
   systemd:
-    name: "{{ postgres_service }}"
+    name: "{{ postgres_service }}@{{ postgres_version }}-main"
     state: started
     enabled: yes
     daemon_reload: yes
 
-- name: Set password for postgres user
-  postgresql_user:
-    name: postgres
-    password: "{{ postgres_admin_password }}"
-    state: present
-  become: true
-  become_user: postgres
-  no_log: true
-
-- name: Create PostgreSQL users
-  postgresql_user:
-    name: "{{ item.name }}"
-    password: "{{ item.password }}"
-    role_attr_flags: "{{ item.flags | default('NOSUPERUSER,NOCREATEDB') }}"
-    state: present
-  loop: "{{ postgres_users | default([]) }}"
-  become: true
-  become_user: postgres
-  no_log: true
-
-- name: Create PostgreSQL databases
-  postgresql_db:
-    name: "{{ item.name }}"
-    owner: "{{ item.owner }}"
-    encoding: "{{ item.encoding | default('UTF-8') }}"
-    template: "{{ item.template | default('template0') }}"
-    state: present
-  loop: "{{ postgres_databases | default([]) }}"
-  become: true
-  become_user: postgres
-
 - name: Configure backup system
   include_tasks: backup.yml
-  when: postgres_enable_backup | default(true)
+  when:
+    - postgres_enable_backup | default(true)
+    - postgres_replication_role != 'standby'
+
+- name: Restart PostgreSQL service
+  systemd:
+    name: "{{ postgres_service }}@{{ postgres_version }}-main"
+    state: restarted
+    enabled: yes

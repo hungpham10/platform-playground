@@ -17,6 +17,10 @@ role_users:
       gid: 2006
       groups: ['blackbox']
       ssh_keys: []
+    - name: prometheus
+      gid: 2007
+      groups: ['prometheus']
+      ssh_keys: []
 
 role_groups:
   gateway:
@@ -28,3 +32,5 @@ role_groups:
       gid: 2005
     - name: blackbox
       gid: 2006
+    - name: prometheus
+      gid: 2007

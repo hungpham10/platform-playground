@@ -1,2 +1,8 @@
+prometheus_arch: "{{ ansible_architecture | regex_replace('x86_64', 'amd64') | regex_replace('aarch64', 'arm64') }}"
+prometheus_version: "3.5.0"
 prometheus_user: "prometheus"
 prometheus_group: "prometheus"
+prometheus_port: 9090
+prometheus_data_dir: "/var/lib/prometheus"
+prometheus_config_dir: "/etc/prometheus"
+prometheus_binary_dir: "/usr/bin"

@@ -1,0 +1,27 @@
+# Ansible managed - DO NOT EDIT MANUALLY
+# See resolved.conf(5) for details
+
+[Resolve]
+# Primary DNS servers
+DNS={{ primary_dns_servers | join(' ') }}
+
+# Fallback DNS servers
+FallbackDNS={{ fallback_dns_servers | join(' ') }}
+
+# Search domains
+Domains={{ dns_search_domains | join(' ') }}
+
+# DNS-over-TLS setting
+DNSOverTLS=opportunistic
+
+# DNSSEC setting
+DNSSEC=allow-downgrade
+
+# DNS cache
+Cache=no
+
+# DNS stub listener
+DNSStubListener=yes
+
+# Read /etc/resolv.conf for fallback config
+ReadEtcResolvConf=no

@@ -1,20 +1,10 @@
 ---
-- name: Configure systemd-timesyncd
-  template:
-    src: timesyncd.conf.j2
-    dest: /etc/systemd/timesyncd.conf
-    owner: root
-    group: root
-    mode: '0644'
-  notify: restart timesyncd
+- name: Set OS family facts
+  set_fact:
+    is_debian_based: "{{ ansible_os_family == 'Debian' }}"
+    is_redhat_based: "{{ ansible_os_family == 'RedHat' }}"
 
-- name: Enable and start systemd-timesyncd
-  systemd:
-    name: systemd-timesyncd
-    state: started
-    enabled: yes
-    daemon_reload: yes
+- name: Configure timesyncd for Debian base
+  include_tasks: timesyncd.yml
+  when: is_debian_based
 
-- name: Set timezone
-  timezone:
-    name: "{{ ntp_timezone | default('UTC') }}"
