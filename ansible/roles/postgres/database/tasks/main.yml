@@ -3,8 +3,19 @@
   assert:
     that:
       - ansible_memtotal_mb >= (postgres_memory_requirement | default(4096))
+    fail_msg: >
+      Host does not meet PostgreSQL memory requirement:
+      Required={{ postgres_memory_requirement | default(4096) }}MB,
+      Found={{ ansible_memtotal_mb }}MB
+
+- name: Verify CPU requirements
+  assert:
+    that:
       - ansible_processor_vcpus >= (postgres_cpu_requirement | default(2))
-    fail_msg: "Host does not meet PostgreSQL requirements"
+    fail_msg: >
+      Host does not meet PostgreSQL CPU requirement:
+      Required={{ postgres_cpu_requirement | default(2) }} vCPUs,
+      Found={{ ansible_processor_vcpus }} vCPUs
 
 - name: Create PostgreSQL directories
   file:
@@ -117,6 +128,7 @@
   loop: "{{ postgres_databases | default([]) }}"
   become: true
   become_user: postgres
+
 - name: Check if replication slot is active
   community.postgresql.postgresql_query:
     db: postgres
@@ -125,8 +137,8 @@
     login_password: "{{ postgres_admin_password }}"
     query: "SELECT active FROM pg_replication_slots WHERE slot_name = '{{ inventory_hostname | regex_replace('-', '_') }}_slot';"
   register: slot_status
-  delegate_to: "{{ groups['postgres-master'][0] }}"
   run_once: true
+  when: "'postgres-master' in groups and groups['postgres-master'] | length > 0"
 
 - name: Setup base backup for standby
   block:

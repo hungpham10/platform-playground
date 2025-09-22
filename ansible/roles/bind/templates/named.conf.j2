@@ -7,9 +7,14 @@
 // See /usr/share/doc/bind*/sample/ for example named configuration files.
 //
 
+statistics-channels {
+  inet 127.0.0.1 port 8053 allow { 127.0.0.1; };
+};
+
 options {
   listen-on port 53    { 0.0.0.0; };
   listen-on-v6 port 53 { none; };
+
   directory 	       "/var/named";
   dump-file 	       "/var/named/data/cache_dump.db";
   secroots-file	       "/var/named/data/named.secroots";

@@ -1,0 +1,14 @@
+[Unit]
+Description=Prometheus BIND Exporter
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/bind_exporter 							\
+  --web.listen-address={{ bind_exporter_listen_address | default('0.0.0.0:9119') }} 	\
+  --bind.stats-url={{ bind_exporter_stats_url | default('127.0.0.1:8053') }} 		\
+  --bind.stats-groups={{ bind_exporter_stats_groups | default('server') }}
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,17 +1,7 @@
-- name: Ensure named configuration directory exists
-  ansible.builtin.file:
-    path: /etc/named
-    state: directory
-    mode: '0755'
-    owner: named
-    group: named
-
 - name: Configure named.conf
   ansible.builtin.template:
     src: named.conf.j2
     dest: /etc/named.conf
-    owner: named
-    group: named
     mode: '0640'
   notify: Restart named
 
@@ -19,13 +9,11 @@
   ansible.builtin.template:
     src: zones.conf.j2
     dest: /etc/zones.conf
-    owner: named
-    group: named
     mode: '0640'
   notify: Restart named
 
 - name: Ensure named service is enabled and started
-  ansible.builtin.service:
+  systemd:
     name: named
     state: started
     enabled: true

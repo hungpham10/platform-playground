@@ -227,18 +227,18 @@
         storage_lvs: "{{ instance_storage.lvs | default([]) }}"
       tags: ["storage"]
 
-    - role: audit
-      vars:
-        audit_rules: "{{ audit_rules | default([]) }}"
-        audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
-        audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
-        audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
-        audit_num_logs: "{{ audit_num_logs | default(5) }}"
-        audit_space_left: "{{ audit_space_left | default(75) }}"
-        audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
-        audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
-        audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
-      tags: ["security", "audit"]
+    #- role: audit
+    #  vars:
+    #    audit_rules: "{{ audit_rules | default([]) }}"
+    #    audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
+    #    audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
+    #    audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
+    #    audit_num_logs: "{{ audit_num_logs | default(5) }}"
+    #    audit_space_left: "{{ audit_space_left | default(75) }}"
+    #    audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
+    #    audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
+    #    audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
+    #  tags: ["security", "audit"]
 
     - role: users
       vars:

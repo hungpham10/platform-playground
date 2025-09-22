@@ -1,5 +1,5 @@
 ---
-- import_playbook: boilerplate.yml
+- import_playbook: ../../boilerplate.yml
 
 - name: Configure PostgreSQL Database Servers
   hosts: postgres-*
@@ -14,19 +14,22 @@
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       loop:
-        - "../group_vars/all"
-        - "../group_vars/database"
+        - "../../../group_vars/all"
+        - "../../../group_vars/database"
       tags: ["always"]
 
     - name: Check if host_vars directory exists
       ansible.builtin.stat:
-        path: "{{ playbook_dir }}/host_vars/{{ inventory_hostname }}"
+        path: "../../../host_vars/{{ inventory_hostname }}"
       register: host_vars_dir
       tags: ["always"]
 
+    - debug:
+        msg: "../../../host_vars/{{ inventory_hostname }}"
+
     - name: Include host specific variables
       include_vars:
-        dir: "host_vars/{{ inventory_hostname }}"
+        dir: "../../../host_vars/{{ inventory_hostname }}"
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       when: host_vars_dir.stat.exists
@@ -139,15 +142,6 @@
         register: pg_connect
         failed_when: pg_connect.rc != 0
         when: (subdomain_instance_role | default('standalone')) != "standby"
-
-      - name: Check if PostgreSQL is in standalone mode
-        ansible.builtin.command:
-          cmd: psql -U postgres -c "SELECT pg_is_in_recovery();"
-        become: yes
-        become_user: postgres
-        register: pg_recovery
-        failed_when: pg_recovery.stdout_lines[2] != ' f'
-        when: (subdomain_instance_role | default('standalone')) == "standalone"
 
       - name: Check if PostgreSQL port 5432 is open
         ansible.builtin.command:

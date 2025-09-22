@@ -38,6 +38,11 @@ role_packages:
   lighthouse:
     yum: []
     apt: []
+  dns:
+    yum: 
+      - bind
+    apt:
+      - bind9
 
 role_package_keys:
   waf:

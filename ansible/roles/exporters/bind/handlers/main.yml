@@ -1,0 +1,5 @@
+- name: Restart bind-exporter
+  systemd:
+    name: bind-exporter
+    state: restarted
+    daemon_reload: yes

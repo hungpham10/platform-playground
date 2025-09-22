@@ -1,0 +1,8 @@
+bind_exporter_version: 0.8.0
+bind_exporter_arch: "{{ ansible_architecture | regex_replace('x86_64', 'amd64') | regex_replace('aarch64', 'arm64') }}"
+bind_exporter_release_name: "bind_exporter-{{ bind_exporter_version }}.linux-amd64"
+bind_exporter_url: "https://github.com/prometheus-community/bind_exporter/releases/download/v{{ bind_exporter_version }}/bind_exporter-{{ bind_exporter_version }}.linux-{{ bind_exporter_arch }}.tar.gz"
+
+bind_exporter_user: bind
+bind_exporter_group: bind
+

@@ -1,6 +1,6 @@
 ---
 # DHCP mode: 'server' or 'client'
-dhcp_mode: "client"
+dhcp_mode: "none"
 
 dhcp_defaults:
   mode: disabled

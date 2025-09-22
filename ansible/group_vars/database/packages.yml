@@ -21,10 +21,10 @@ role_packages:
     yum: []
     apt:
       # Core PostgreSQL packages
-      - postgresql-14
-      - postgresql-client-14
-      - postgresql-contrib-14
-      - postgresql-14-repack
+      - postgresql-16
+      - postgresql-client-16
+      - postgresql-contrib-16
+      - postgresql-16-repack
       - libpq-dev
 
       # PostgreSQL monitoring and logging
@@ -50,12 +50,12 @@ role_packages:
       - postgresql-client    
 
       # Full text search
-      - postgresql-14-rum
+      - postgresql-16-rum
 
       # Performance tools
-      - postgresql-14-hypopg
-      - postgresql-14-cron
-      - postgresql-14-partman
+      - postgresql-16-hypopg
+      - postgresql-16-cron
+      - postgresql-16-partman
       
       # System utilities
       - net-tools

@@ -1,5 +1,5 @@
 ---
-- import_playbook: postgres-instance.yml
+- import_playbook: instance.yml
 
 - name: Configure PostgreSQL Database Servers
   hosts: postgres-*

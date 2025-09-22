@@ -21,12 +21,6 @@
     daemon_reload: yes
   when: ansible_os_family == "Debian"
 
-- name: Test DNS resolution
-  command: dig google.com
-  register: dns_test
-  changed_when: false
-  when: ansible_os_family == "Debian"
-
 - name: Create custom resolv.conf to prevent overwrites
   copy:
     content: |

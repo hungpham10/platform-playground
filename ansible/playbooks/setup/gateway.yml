@@ -1,19 +1,44 @@
 ---
-- import_playbook: boilerplate.yml
+- import_playbook: ../boilerplate.yml
 
 - name: Configure Gateway Instance
-  hosts: gateway
+  hosts: gateway-*
   become: true
   vars:
     instance_role: gateway
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../group_vars/all"
+        - "../../group_vars/gateway"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
   roles:
-    # @NOTE: setup blackbox
-    - role: blackbox
+    # @NOTE: setup prometheus
+    - role: prometheus
       when: (instance_role == 'gateway') and (lighthouse_enabled | default(false))
       tags: ["monitor"]
 
-    # @NOTE: setup prometheus
-    - role: prometheus
+    # @NOTE: setup blackbox
+    - role: exporters/blackbox
       when: (instance_role == 'gateway') and (lighthouse_enabled | default(false))
       tags: ["monitor"]
 
@@ -38,9 +63,14 @@
     # @NOTE: setup bind
     - role: bind
       vars:
-        internal_zones: "{{ bind_configs.zones }}"
-        internal_subnets: "{{ bind_configs.subnets }}"
-        internet_dns_resolvers: "{{ bind_configs.nameservers }}"
+        internal_zones: "{{ bind_configs.zones | default([]) }}"
+        internal_subnets: "{{ bind_configs.subnets | default([]) }}"
+        internet_dns_resolvers: "{{ bind_configs.nameservers | default([]) }}"
+      when: (instance_role == 'gateway') and (dns_enabled | default(false))
+      tags: ["network", "dns"]
+
+    # @NOTE: setup bind exporter
+    - role: exporters/bind
       when: (instance_role == 'gateway') and (dns_enabled | default(false))
       tags: ["network", "dns"]
 

@@ -1,0 +1,43 @@
+---
+- name: Download bind exporter binary
+  get_url:
+    url: "{{ bind_exporter_url }}"
+    dest: "/tmp/bind_exporter.tar.gz"
+    mode: '0644'
+
+- name: Unarchive package
+  unarchive:
+    src: "/tmp/bind_exporter.tar.gz"
+    dest: "/tmp/"
+    remote_src: yes
+  register: unarchive_result
+
+- name: Copy binary to correct destination
+  copy:
+    src: "/tmp/bind_exporter-{{ bind_exporter_version }}.linux-{{ bind_exporter_arch }}/bind_exporter"
+    dest: "/usr/bin/bind_exporter"
+    owner: "{{ bind_exporter_user }}"
+    group: "{{ bind_exporter_group }}"
+    mode: '0755'
+    remote_src: yes
+
+- name: Render bind-exporter.service
+  template:
+    src: bind-exporter.service.j2
+    dest: "/etc/systemd/system/bind-exporter.service"
+    mode: '0644'
+  notify: Restart bind-exporter
+
+- name: Start and enable Bind Exporter service
+  systemd:
+    name: bind-exporter
+    state: started
+    enabled: yes
+
+- name: Verify Bind Exporter metrics endpoint
+  uri:
+    url: "http://{{ bind_exporter_listen_address | default('0.0.0.0:9119') }}/metrics"
+    method: GET
+    status_code: 200
+  register: bind_metrics
+  failed_when: bind_metrics.status != 200
