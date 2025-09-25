@@ -12,7 +12,7 @@ statistics-channels {
 };
 
 options {
-  listen-on port 53    { 0.0.0.0; };
+  listen-on port 53    { {{ ansible_default_ipv4.address }}; };
   listen-on-v6 port 53 { none; };
 
   directory 	       "/var/named";
@@ -47,14 +47,19 @@ options {
   */
   forwarders {
     {% for entry in internet_dns_resolvers | default([]) %}
-    {{ entry }}
+    {{ entry }};
     {% endfor %}
   };
   forward only;
   
   recursion yes;
-  dnssec-validation auto;
+  dnssec-validation no;
   
+  recursive-clients 1000;  # Tăng nếu có nhiều truy vấn đồng thời
+
+  max-cache-size 512M;     // Tăng từ default, tùy RAM (test với 256M trước).
+  max-cache-ttl 86400;     // Cache lâu hơn nếu forwarders ổn định.
+
   managed-keys-directory "/var/named/dynamic";
   geoip-directory "/usr/share/GeoIP";
   
@@ -72,18 +77,9 @@ logging {
     print-category yes;
   };
   category default { named_syslog; };
-  category queries { named_syslog; };
-  category security { named_syslog; };
-  category lame-servers { null; };
-  
-  // Statistic log
-  channel statistics {
-    file "/var/named/data/named_stats.log" versions 3 size 5m;
-    severity info;
-    print-time yes;
-    print-category yes;
-  };
-  category statistics { statistics; };
+  category queries { null; };
+  category security { null; };
+  category lame-servers { null; };  
 };
 
 include "/etc/zones.conf";

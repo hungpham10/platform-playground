@@ -1,7 +1,52 @@
+- name: Ensure required directories exist with correct permissions
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: bind
+    group: bind
+    mode: '0750'
+  loop:
+    - /var/named
+    - /var/named/data
+    - /var/named/dynamic
+    - /var/log/named
+  notify: Restart named
+
+- name: Ensure /etc/bind directory exists
+  ansible.builtin.file:
+    path: /etc/bind
+    state: directory
+    owner: root
+    group: bind
+    mode: '0750'
+
+- name: Generate rndc.key if not exists
+  ansible.builtin.command:
+    cmd: rndc-confgen -a -c /etc/bind/rndc.key
+    creates: /etc/bind/rndc.key
+  notify: Restart named
+
+- name: Set permissions for rndc.key
+  ansible.builtin.file:
+    path: /etc/bind/rndc.key
+    owner: root
+    group: bind
+    mode: '0640'
+  notify: Restart named
+
+- name: Configure /etc/default/named to use /etc/named.conf
+  lineinfile:
+    path: /etc/default/named
+    regexp: '^OPTIONS='
+    line: 'OPTIONS="-u bind -c /etc/named.conf"'
+  notify: Restart named
+
 - name: Configure named.conf
   ansible.builtin.template:
     src: named.conf.j2
     dest: /etc/named.conf
+    owner: root
+    group: bind
     mode: '0640'
   notify: Restart named
 
@@ -9,6 +54,8 @@
   ansible.builtin.template:
     src: zones.conf.j2
     dest: /etc/zones.conf
+    owner: root
+    group: bind
     mode: '0640'
   notify: Restart named
 
@@ -17,3 +64,14 @@
     name: named
     state: started
     enabled: true
+
+- name: Increase file descriptors for named service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/named.service.d/override.conf
+    content: |
+      [Service]
+      LimitNOFILE=65536
+    mode: '0644'
+    owner: root
+    group: root
+  notify: Reload systemd and restart named

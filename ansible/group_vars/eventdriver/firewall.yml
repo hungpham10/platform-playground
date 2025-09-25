@@ -1,0 +1,8 @@
+---
+firewall_rules:
+  tcp_ports:
+    - port: 9093
+      comment: "Kafka controller"
+    - port: 9092
+      comment: "Kafka broker"
+  custom: []

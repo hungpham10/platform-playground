@@ -3,3 +3,9 @@
   ansible.builtin.service:
     name: named
     state: restarted
+
+- name: Reload systemd and restart named
+  ansible.builtin.systemd:
+    daemon_reload: yes
+    name: named
+    state: restarted

@@ -1,9 +1,9 @@
 ---
 # PostgreSQL configuration defaults
+postgres_version: "16"
 postgres_defaults:
-  version: "14"
-  conf_dir: "/var/lib/postgresql/14/main"
-  data_dir: "/var/lib/postgresql/14/main"
+  conf_dir: "/var/lib/postgresql/{{ postgres_version }}/main"
+  data_dir: "/var/lib/postgresql/{{ postgres_version }}/main"
   backup_dir: "/var/lib/postgresql/backup"
   archive_dir: "/var/lib/postgresql/archive"
   max_connections: 100

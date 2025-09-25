@@ -1,12 +1,4 @@
 ---
-- name: Verify required packages
-  assert:
-    that: 
-      - ansible_facts.packages[item] is defined
-    fail_msg: "Required package {{ item }} is not installed"
-    success_msg: "Required package {{ item }} is present"
-  loop: "{{ pgpool_required_packages }}"
-
 - name: Create PgPool directories
   file:
     path: "{{ item }}"
@@ -45,20 +37,6 @@
     group: postgres
     mode: '0640'
   notify: restart pgpool
-
-- name: Configure systemd service
-  template:
-    src: pgpool.service.j2
-    dest: /etc/systemd/system/pgpool.service
-    mode: '0644'
-  notify: restart pgpool
-
-- name: Start and enable PgPool
-  systemd:
-    name: pgpool
-    state: started
-    enabled: yes
-    daemon_reload: yes
 
 - name: Wait for PgPool to be ready
   wait_for:

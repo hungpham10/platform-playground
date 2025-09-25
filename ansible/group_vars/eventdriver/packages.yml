@@ -1,0 +1,16 @@
+role_packages:
+  eventdriver:
+    yum:
+      - java-17-openjdk
+    apt:
+      - openjdk-17-jdk
+
+role_package_repos:
+  eventdriver:
+    yum: []
+    apt: []
+
+role_public_signing_keys:
+  eventdriver:
+    yum: []
+    apt: []

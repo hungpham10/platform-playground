@@ -55,7 +55,6 @@
     # PostgreSQL setup
     - role: postgres/database
       vars:
-        postgres_version: "{{ postgres_defaults.version }}"
         postgres_data_dir: "{{ postgres_defaults.data_dir }}"
         postgres_config_path: "{{ postgres_defaults.conf_dir }}"
         postgres_backup_dir: "{{ postgres_defaults.backup_dir }}"
@@ -70,7 +69,7 @@
       vars:
         logrotate_custom_entries:
           - name: postgres-for-analyse
-            path: "/var/lib/postgresql/{{ postgres_defaults.version }}/main/log/*.log"
+            path: "/var/lib/postgresql/{{ postgres_version }}/main/log/*.log"
             frequency: daily
             options:
               - daily
@@ -80,7 +79,7 @@
               - missingok
               - notifempty
             create: "0640 postgres postgres"
-            postrotate_script: "/usr/lib/postgresql/{{ postgres_defaults.version }}/bin/pg_ctl -D {{ postgres_defaults.data_dir }} reload"
+            postrotate_script: "/usr/lib/postgresql/{{ postgres_version }}/bin/pg_ctl -D {{ postgres_defaults.data_dir }} reload"
           - name: postgres-for-storing
             path: "/var/log/postgres.log"
             frequency: daily

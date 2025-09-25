@@ -1,0 +1,11 @@
+role_users:
+  eventdriver:
+    - name: kafka
+      uid: 2003
+      groups: ['kafka']
+      ssh_keys: []
+
+role_groups:
+  eventdriver:
+    - name: kafka
+      gid: 2003

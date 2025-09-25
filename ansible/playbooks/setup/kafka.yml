@@ -1,0 +1,148 @@
+---
+- import_playbook: ../boilerplate.yml
+
+- name: Configure Gateway Instance
+  hosts: kafka-*
+  become: true
+  vars:
+    instance_role: eventdriver
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../group_vars/all"
+        - "../../group_vars/eventdriver"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - debug:
+        msg: "../../host_vars/{{ inventory_hostname }}"
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+  roles:
+    - role: kafka
+      tags: ["kafka"]
+
+  post_tasks:
+    - name: Check if failover-test topic exists
+      ansible.builtin.shell:
+        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --list --topic failover-test"
+      become_user: kafka
+      register: topic_check
+      retries: 3
+      delay: 5
+      until: topic_check.rc == 0
+      run_once: true
+      changed_when: false
+      ignore_errors: true
+
+    - name: Create test topic for failover (replication factor = num controllers)
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
+      become_user: kafka
+      run_once: true  # Chỉ chạy trên 1 node
+      register: topic_create
+      failed_when: topic_create.rc != 0 and 'TopicAlreadyExists' not in topic_create.stderr
+      when: "'failover-test' not in topic_check.stdout"
+    
+    - name: Produce test messages
+      ansible.builtin.shell: |
+        set -o pipefail
+        for i in {1..10}; do
+          echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test
+        done
+      become_user: kafka
+      run_once: true
+      register: produce_result
+    
+    - name: Consume and verify messages before failover
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test --from-beginning --max-messages 10
+      become_user: kafka
+      run_once: true
+      register: consume_before
+      changed_when: false
+    
+    - name: Debug pre-failover consumption
+      ansible.builtin.debug:
+        msg: "Messages before failover: {{ consume_before.stdout_lines }}"
+    
+    - name: Simulate failover - Stop Kafka on first controller
+      ansible.builtin.systemd:
+        name: kafka
+        state: stopped
+      delegate_to: "{{ groups['controllers'][0] }}"  # Failover node đầu tiên
+      register: failover_stop
+    
+    - name: Wait for failover (give time for election ~10s)
+      ansible.builtin.pause:
+        seconds: 10
+
+    - name: Check cluster health after failover (quorum status)
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host'] }}:9092 describe --status
+      become_user: kafka
+      run_once: true
+      register: quorum_after
+      failed_when: quorum_after.rc != 0 or 'Leader' not in quorum_after.stdout  # Check có leader mới
+      changed_when: false
+    
+    - name: Consume messages after failover (verify no data loss)
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host']}}:9092 --topic failover-test --from-beginning --max-messages 10
+      become_user: kafka
+      run_once: true
+      register: consume_after
+      changed_when: false
+    
+    - name: Debug post-failover consumption and quorum
+      ansible.builtin.debug:
+        msg: |
+          Quorum after failover: {{ quorum_after.stdout }}
+          Messages after failover: {{ consume_after.stdout_lines }}
+    
+    - name: Restart failed controller for recovery
+      ansible.builtin.systemd:
+        name: kafka
+        state: started
+      delegate_to: "{{ groups['controllers'][0] }}"
+    
+    - name: Wait for recovery
+      ansible.builtin.pause:
+        seconds: 10
+    
+    - name: Final health check after recovery
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 describe --status
+      become_user: kafka
+      run_once: true
+      register: quorum_final
+      failed_when: quorum_final.rc != 0
+      changed_when: false
+    
+    - name: Cleanup test topic (optional)
+      ansible.builtin.shell: |
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --delete --topic failover-test
+      become_user: kafka
+      run_once: true
+      ignore_errors: yes
