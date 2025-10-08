@@ -56,8 +56,14 @@ role_packages:
       - postgresql-{{ postgres_version }}-hypopg
       - postgresql-{{ postgres_version }}-cron
       - postgresql-{{ postgres_version }}-partman
-      
+
+      # Sharding tools
+      - postgresql-{{ postgres_version }}-citus
+      - citus-toolkit
+
       # System utilities
       - net-tools
       - iotop
       - sysstat
+
+

@@ -1,0 +1,57 @@
+---
+- name: Ensure .ssh directory exists on all nodes
+  file:
+    path: "/home/{{ ssh_user }}/.ssh"
+    state: directory
+    owner: "{{ ssh_user }}"
+    group: "{{ ssh_user }}"
+    mode: '0700'
+
+- name: Generate SSH key pair on each node (if not exists)
+  command: >
+    ssh-keygen -t {{ ssh_key_type }} -b {{ ssh_key_size }} -f /home/{{ ssh_user }}/.ssh/{{ ssh_key_name }} -N "" -q
+  args:
+    creates: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}"
+  become: yes
+  become_user: "{{ ssh_user }}"
+  register: keygen_result
+
+- name: Read public key from each node
+  slurp:
+    src: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}.pub"
+  register: node_public_keys
+
+- name: Distribute current node's public key to all nodes' authorized_keys
+  ansible.posix.authorized_key:
+    user: "{{ ssh_user }}"
+    state: present
+    key: "{{ node_public_keys.content | b64decode | trim }}"
+    manage_dir: true
+  delegate_to: "{{ item }}"
+  loop: "{{ ansible_play_hosts }}"
+  when: node_public_keys.content is defined
+
+- name: Collect all hostnames
+  set_fact:
+    all_hostnames: "{{ ansible_play_hosts | map('regex_replace', '^(.*)$', '\\1') | list | unique }}"
+  run_once: true
+
+- name: Read authorized_keys on each node
+  slurp:
+    src: "/home/{{ ssh_user }}/.ssh/authorized_keys"
+  register: auth_keys
+  become: yes
+  become_user: "{{ ssh_user }}"
+
+- name: Parse authorized_keys content
+  set_fact:
+    configured_hostnames: "{{ auth_keys.content | b64decode | split('\n') | reject('equalto', '') | map('split', '@') | map('last') }}"
+
+- name: Check for missing hostnames in authorized_keys
+  set_fact:
+    missing_hostnames: "{{ all_hostnames | reject('in', configured_hostnames) | list }}"
+
+- name: Fail if any hostname is missing in authorized_keys
+  fail:
+    msg: "Thiếu hostname trong authorized_keys trên {{ inventory_hostname }}: {{ missing_hostnames | join(', ') }}"
+  when: missing_hostnames | length > 0

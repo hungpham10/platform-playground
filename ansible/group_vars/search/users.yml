@@ -1,0 +1,11 @@
+role_users:
+  search:
+    - name: elasticsearch
+      uid: 2003
+      groups: ['elasticsearch']
+      ssh_keys: []
+
+role_groups:
+  search:
+    - name: elasticsearch
+      gid: 2003

@@ -1,0 +1,9 @@
+appender.syslog.type = Syslog
+appender.syslog.name = SYSLOG
+appender.syslog.facility = LOCAL5
+appender.syslog.host = localhost
+appender.syslog.port = 514
+appender.syslog.protocol = UDP
+appender.syslog.layout.type = PatternLayout
+rootLogger.appenderRef.syslog.ref = SYSLOG
+appender.syslog.layout.pattern = "local5: %d{yyyy.MM.dd HH:mm:ss} %-5p [%c] %m%n"

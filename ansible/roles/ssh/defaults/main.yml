@@ -1,0 +1,10 @@
+---
+# SSH user for all nodes
+ssh_user: "{{ ansible_user }}"
+
+# SSH key name (will be created in ~/.ssh/)
+ssh_key_name: "id_ed25519"
+
+# SSH key type and size
+ssh_key_type: "ed25519"
+ssh_key_size: 4096

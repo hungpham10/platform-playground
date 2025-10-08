@@ -1,17 +1,4 @@
 ---
-- name: Verify required packages
-  assert:
-    that: 
-      - ansible_facts.packages[item] is defined
-    fail_msg: "Required package {{ item }} is not installed"
-    success_msg: "Required package {{ item }} is present"
-  loop: "{{ citus_required_packages }}"
-
-- name: Install Citus packages
-  package:
-    name: "{{ citus_required_packages }}"
-    state: present
-
 - name: Configure Citus extension
   postgresql_ext:
     name: citus
@@ -32,12 +19,3 @@
   become_user: postgres
   notify: restart postgresql
 
-- name: Create distributed tables
-  postgresql_query:
-    db: postgres
-    query: "SELECT create_distributed_table('{{ item.table }}', '{{ item.column }}');"
-    login_user: postgres
-  loop: "{{ citus_distributed_tables }}"
-  become: true
-  become_user: postgres
-  when: citus_distributed_tables is defined

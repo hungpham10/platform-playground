@@ -1,0 +1,40 @@
+role_packages:
+  search:
+    yum:
+      - rsync
+      - sshpass
+      - unzip
+      - java-17-openjdk
+      - elasticsearch-{{ es_version }}
+    apt:
+      - rsync
+      - sshpass
+      - unzip
+      - openjdk-17-jdk
+      - elasticsearch
+
+role_package_repos:
+  search:
+    yum:
+      - name: elasticsearch
+        description: Elasticsearch repository for 8.x packages
+        baseurl: https://artifacts.elastic.co/packages/8.x/yum
+        gpgcheck: yes
+        gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        enabled: yes
+    apt:
+      - "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/9.x/apt stable main"
+
+role_package_keys:
+  search:
+    yum:
+      - "https://artifacts.elastic.co/GPG-KEY-elasticsearch"
+    apt: []
+
+role_public_signing_keys:
+  search:
+    yum: []
+    apt: 
+      - url: https://artifacts.elastic.co/GPG-KEY-elasticsearch
+        key: elasticsearch-keyring.gpg
+        state: present

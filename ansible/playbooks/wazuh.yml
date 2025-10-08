@@ -1,0 +1,10 @@
+---
+- name: Configure Base Instance
+  hosts: all
+  become: true
+  roles:
+    - role: wazuh-agent
+      vars:
+        wazuh_agent_group: "FCI_TNSL_VMs_Zone"
+      tags: ["wazuh"]
+

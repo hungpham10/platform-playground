@@ -1,0 +1,270 @@
+- name: Create Elasticsearch directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: elasticsearch
+    group: elasticsearch
+    mode: 0755
+  loop:
+    - "{{ es_data_dir }}"
+    - "{{ es_log_dir }}"
+    - "{{ es_conf_dir }}/certs"
+    - "{{ es_conf_dir }}/certs/ca"
+
+- name: Try to set permissions, ignore if file is absent
+  become: true
+  file:
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0644'
+    state: file
+    path: "{{ item }}"
+  loop:
+    - "/etc/sysconfig/elasticsearch"
+    - "/etc/elasticsearch/elasticsearch.yml"
+  ignore_errors: true
+  failed_when: false
+
+- name: Ensure elasticsearch user owns the ca directory and files on es-1
+  file:
+    path: "{{ item.path }}"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: "{{ item.mode }}"
+  loop:
+    - path: /etc/elasticsearch
+      mode: '0750'
+    - path: /etc/elasticsearch/certs
+      mode: '0750'
+
+- name: Render log4j2.properties
+  template:
+    src: log4j2.properties.j2
+    dest: "{{ es_conf_dir }}/log4j2.properties"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: 0660
+  notify: Restart elasticsearch
+
+- name: Render elasticsearch.yml
+  template:
+    src: elasticsearch.yml.j2
+    dest: "{{ es_conf_dir }}/elasticsearch.yml"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: 0660
+  notify: Restart elasticsearch
+
+- name: Generate certificates on first master node
+  become: true
+  block:
+    - name: Create instances.yml for cert generation
+      template:
+        src: instances.yml.j2
+        dest: "{{ es_conf_dir }}/instances.yml"
+        mode: 0644
+
+    - name: Generate CA if not exists
+      command: "{{ es_home }}/bin/elasticsearch-certutil ca --silent --pem --out {{ es_conf_dir }}/certs/ca.zip --days 3650"
+      args:
+        creates: "{{ es_conf_dir }}/certs/ca.zip"
+      register: ca_result
+      failed_when: ca_result.rc != 0 and "already exists" not in ca_result.stderr
+
+    - name: Try to set correct permissions for CA file
+      file:
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0644'
+        state: file
+        path: "{{ es_conf_dir }}/certs/ca.zip"
+      become: true
+
+    - name: Unzip CA files on master
+      unarchive:
+        src: "{{ es_conf_dir }}/certs/ca.zip"
+        dest: "{{ es_conf_dir }}/certs"
+        remote_src: true
+        owner: elasticsearch
+        group: elasticsearch
+        mode: 0644
+
+    - name: Ensure elasticsearch user owns the ca directory and files on es-1
+      file:
+        path: "{{ item.path }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: "{{ item.mode }}"
+      loop:
+        - path: /etc/elasticsearch/certs/ca
+          mode: '0750'
+        - path: /etc/elasticsearch/certs/ca/ca.crt
+          mode: '0640'
+        - path: /etc/elasticsearch/certs/ca/ca.key
+          mode: '0640'
+
+    - name: Generate node certificates in PEM format
+      command: "{{ es_home }}/bin/elasticsearch-certutil cert --silent --pem --ca-cert {{ es_conf_dir }}/certs/ca/ca.crt --ca-key {{ es_conf_dir }}/certs/ca/ca.key --in {{ es_conf_dir }}/instances.yml --out {{ es_conf_dir }}/certs/certificates.zip --days 3650"
+      args:
+        creates: "{{ es_conf_dir }}/certs/certificates.zip"
+      register: cert_result
+      failed_when: cert_result.rc != 0
+
+    - name: Try to set correct permissions for certificates file
+      file:
+        owner: elasticsearch
+        group: elasticsearch
+        state: file
+        mode: 0644
+        path: "{{ es_conf_dir }}/certs/certificates.zip"
+      become: true
+
+    - name: Unzip node certificates on master
+      unarchive:
+        src: "{{ es_conf_dir }}/certs/certificates.zip"
+        dest: "{{ es_conf_dir }}/certs"
+        remote_src: true
+        owner: elasticsearch
+        group: elasticsearch
+        mode: 0644
+
+    - name: Ensure elasticsearch user owns the certificate directory
+      file:
+        path: "/etc/elasticsearch/certs/{{ item.0 }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: "{{ item.1.mode }}"
+      loop: "{{ groups['elasticsearch-nodes'] | product([ { 'mode': '0750' }, ]) | list }}"
+
+    - name: Ensure elasticsearch user owns the certificate files
+      file:
+        path: "/etc/elasticsearch/certs/{{ item.0 }}/{{ item.0 }}.{{ item.1.ext }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: "{{ item.1.mode }}"
+      loop: "{{ groups['elasticsearch-nodes'] | product([
+          { 'ext': 'crt', 'mode': '0640' },
+          { 'ext': 'key', 'mode': '0640' }
+        ]) | list }}"
+
+    - name: Copy certificate files for the first node
+      copy:
+        src: "/etc/elasticsearch/certs/{{ item.src }}"
+        dest: "/etc/elasticsearch/certs/{{ item.dst }}"
+        remote_src: yes
+        mode: '0644'
+      loop:
+        - { 'src': "{{ inventory_hostname }}/{{ inventory_hostname }}.crt", 'dst': "{{ inventory_hostname }}.crt" }
+        - { 'src': "{{ inventory_hostname }}/{{ inventory_hostname }}.key", 'dst': "{{ inventory_hostname }}.key" }
+
+  when: inventory_hostname == groups['elasticsearch-nodes'][0]
+
+- name: Synchronize CA and node certificates from first master to all nodes using elasticsearch user
+  command:
+    cmd: "rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' elasticsearch@{{ groups['elasticsearch-master'][0] }}:{{ es_conf_dir }}/certs/{{ item.src }} {{ es_conf_dir }}/certs/{{ item.dest }}"
+    creates: "{{ es_conf_dir }}/certs/{{ item.dest }}"
+  become: true
+  become_user: elasticsearch
+  loop:
+    - src: "ca/ca.crt"
+      dest: "ca/ca.crt"
+    - src: "{{ inventory_hostname }}/{{ inventory_hostname }}.crt"
+      dest: "{{ inventory_hostname }}.crt"
+    - src: "{{ inventory_hostname }}/{{ inventory_hostname }}.key"
+      dest: "{{ inventory_hostname }}.key"
+  when: inventory_hostname != groups['elasticsearch-master'][0]
+
+- name: Try to set correct permissions for certificates file
+  file:
+    owner: elasticsearch
+    group: elasticsearch
+    state: file
+    mode: 0644
+    path: "{{ item }}"
+  loop:
+    - "{{ es_conf_dir }}/certs/ca/ca.crt"
+    - "{{ es_conf_dir }}/certs/{{ inventory_hostname }}.crt"
+    - "{{ es_conf_dir }}/certs/{{ inventory_hostname }}.key"
+  become: true
+  notify: Daemon reload
+
+- name: Start and enable Elasticsearch service
+  service:
+    name: elasticsearch
+    state: started
+    enabled: true
+
+- name: Wait service to be ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 9200
+    delay: 10
+    timeout: 60
+    
+- name: Setup account
+  block:
+    - name: Random first password
+      shell: echo 'y' | /usr/share/elasticsearch/bin/elasticsearch-reset-password -u elastic -s -a -f
+      register: es_passwords_output
+      changed_when: false
+      failed_when: false 
+    
+    - name: Parse output to get new elastic password
+      set_fact:
+        es_admin_pass: "{{ es_passwords_output.stdout }}"
+    
+    - name: Print elastic password
+      debug:
+        msg: "{{ es_admin_pass }}"
+
+    - name: Create or update role
+      uri:
+        url: "https://{{ inventory_hostname }}:9200/_security/role/{{ item.role }}"
+        user: "{{ es_admin_user }}"
+        password: "{{ es_admin_pass }}"
+        method: PUT
+        body_format: json
+        body: |
+          {
+            "cluster": {{ item.cluster | to_json }},
+            "indices": {{ item.indices | to_json }},
+            "run_as": [],
+            "metadata": {{ item.metadata | to_json }}
+          }
+        status_code: [200, 201]
+        validate_certs: no
+        force_basic_auth: yes
+        return_content: yes
+      register: role_result
+      when: es_admin_pass != ""
+      loop: "{{ es_roles }}"
+      ignore_errors: yes
+
+    - name: New Elasticsearch users
+      uri:
+        url: "https://{{ inventory_hostname }}:9200/_security/user/{{ item.username }}"
+        user: "{{ es_admin_user }}"
+        password: "{{ es_admin_pass }}"
+        method: PUT
+        body_format: json
+        body:
+          password: "{{ item.password }}"
+          roles: "{{ item.roles }}"
+          full_name: "{{ item.username }}"
+          email: "{{ item.email }}"
+        status_code: 200
+        validate_certs: no
+      loop: "{{ es_users }}"
+      when: es_admin_pass != "" and (es_users | length > 0)
+    
+    - name: Check elastic account
+      uri:
+        url: "https://{{ inventory_hostname }}:9200/_security/user"
+        user: "{{ es_admin_user }}"
+        password: "{{ es_admin_pass }}"
+        method: GET
+        status_code: 200
+        validate_certs: no
+      register: users_check
+      when: es_admin_pass != "" and (es_users | length > 0)
+  when: inventory_hostname == groups['elasticsearch-master'][0]

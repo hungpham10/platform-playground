@@ -1,0 +1,29 @@
+{% if es_config %}
+{{ es_config | to_nice_yaml(indent=2) }}
+{% endif %}
+
+{% if es_config['cluster.name'] is not defined %}
+cluster.name: elasticsearch
+{% endif %}
+
+{% if es_config['node.name'] is not defined %}
+node.name: {{inventory_hostname}}
+{% endif %}
+
+xpack.security:
+  enabled: true
+  transport.ssl:
+    enabled: true
+    key: {{ es_conf_dir }}/certs/{{ inventory_hostname }}.key
+    certificate: {{ es_conf_dir }}/certs/{{ inventory_hostname }}.crt
+    certificate_authorities: ["{{ es_conf_dir }}/certs/ca/ca.crt"]
+
+  http.ssl:
+    enabled: true
+    key: {{ es_conf_dir }}/certs/{{ inventory_hostname }}.key
+    certificate: {{ es_conf_dir }}/certs/{{ inventory_hostname }}.crt
+    certificate_authorities: ["{{ es_conf_dir }}/certs/ca/ca.crt"]
+
+path:
+  data: {{ es_data_dir }}
+  logs: {{ es_log_dir }}

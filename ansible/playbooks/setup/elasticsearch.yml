@@ -1,0 +1,149 @@
+---
+- import_playbook: ../boilerplate.yml
+
+- name: Configure Elasticsearch Instance
+  hosts: es-*
+  become: true
+  vars:
+    instance_role: search
+    es_host: "https://{{ inventory_hostname }}:9200"
+    es_user: "admin"
+    es_pass: "rootroot"
+    ca_cert_path: "/etc/elasticsearch/certs/ca/ca.crt"
+    test_index: "test-index"
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../group_vars/all"
+        - "../../group_vars/{{ instance_role }}"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+    - name: Define node roles based on group membership
+      set_fact:
+        roles_list: "{{ ([] | 
+                       union(['master'] if inventory_hostname in groups['elasticsearch-master'] else []) | 
+                       union(['data'] if inventory_hostname in groups['elasticsearch-data'] else [])) }}"
+
+    - name: Define elastic accounts
+      set_fact:
+        es_users: "{{ (es_users | default([])) + es_default_users }}"
+
+    - name: Define elastic roles
+      set_fact:
+        es_roles: "{{ (es_roles | default([])) + es_default_roles }}"
+  roles:
+    - role: ssh
+      vars:
+        ssh_user: "elasticsearch"
+      tags: ["cluster"]
+
+    - role: elasticsearch
+      tags: ["elasticsearch"]
+
+  post_tasks:
+    - name: Test kết nối và info cluster
+      uri:
+        url: "{{ es_host }}/_cluster/health?pretty"
+        method: GET
+        user: "{{ es_user }}"
+        password: "{{ es_pass }}"
+        validate_certs: yes
+        ca_path: "{{ ca_cert_path }}"
+        force_basic_auth: yes
+        return_content: yes
+      register: es_health
+      failed_when: false  # Không fail ngay nếu lỗi, để debug
+
+    - name: Hiển thị health status
+      debug:
+        msg: |
+          Kết nối thành công!
+          Status: {{ (es_health.json.status if es_health.status == 200 else 'Lỗi') }}
+          Cluster name: {{ es_health.json.cluster_name if es_health.status == 200 else 'N/A' }}
+          Active shards: {{ es_health.json.active_shards if es_health.status == 200 else 'N/A' }}
+      when: es_health.status == 200
+
+    - name: Báo lỗi nếu kết nối fail
+      fail:
+        msg: "❌ Lỗi kết nối: {{ es_health.msg | default(es_health.status) }}. Kiểm tra SSL/auth/logs ES."
+      when: es_health.status != 200
+
+    - name: Tạo index test
+      uri:
+        url: "{{ es_host }}/{{ test_index }}"
+        method: PUT
+        body_format: json
+        body: '{"settings": {"number_of_shards": 1}}'
+        user: "{{ es_user }}"
+        password: "{{ es_pass }}"
+        validate_certs: yes
+        ca_path: "{{ ca_cert_path }}"
+        force_basic_auth: yes
+        status_code: [200, 400] # 200: tạo mới, 400: đã tồn tại (OK)
+      register: create_index
+      ignore_errors: yes
+
+    - name: Index một document
+      uri:
+        url: "{{ es_host }}/{{ test_index }}/_doc/1"
+        method: POST
+        body_format: json
+        body: '{"message": "Hello from Ansible test!"}'
+        user: "{{ es_user }}"
+        password: "{{ es_pass }}"
+        validate_certs: yes
+        ca_path: "{{ ca_cert_path }}"
+        force_basic_auth: yes
+        status_code: [200, 201]  # 201: tạo mới, 200: update/conflict (nếu doc đã có)
+        return_content: yes
+      register: index_doc
+      when: 
+        - create_index is defined  # Kiểm tra biến tồn tại
+        - create_index.status is defined  # Kiểm tra key status tồn tại
+        - create_index.status in [200, 400]  # Run nếu index OK (tạo mới hoặc exists)
+
+    - name: Search document
+      uri:
+        url: "{{ es_host }}/{{ test_index }}/_search"
+        method: POST
+        body_format: json
+        body: '{"query": {"match": {"message": "Hello"}}}'
+        user: "{{ es_user }}"
+        password: "{{ es_pass }}"
+        validate_certs: yes
+        ca_path: "{{ ca_cert_path }}"
+        force_basic_auth: yes
+        status_code: 200
+      register: search_result
+      when: index_doc.status == 201
+
+    - name: Cleanup - Xóa index test
+      uri:
+        url: "{{ es_host }}/{{ test_index }}"
+        method: DELETE
+        user: "{{ es_user }}"
+        password: "{{ es_pass }}"
+        validate_certs: yes
+        ca_path: "{{ ca_cert_path }}"
+        force_basic_auth: yes
+        status_code: [200, 404]  # OK nếu không tồn tại
+      ignore_errors: yes

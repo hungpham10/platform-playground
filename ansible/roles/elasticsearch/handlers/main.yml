@@ -1,0 +1,17 @@
+- name: Restart elasticsearch
+  block:
+    - name: Restart elasticsearch
+      systemd:
+        name: elasticsearch
+        state: restarted
+
+    - name: Wait service to be ready
+      wait_for:
+        host: "{{ inventory_hostname }}"
+        port: 9200
+        delay: 10
+        timeout: 60
+
+- name: Daemon reload
+  systemd:
+    daemon_reload: yes

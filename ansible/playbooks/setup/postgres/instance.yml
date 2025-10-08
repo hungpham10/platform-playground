@@ -43,6 +43,7 @@
       set_fact:
         postgres_database_list: "{{ (postgres_database_list | default([])) + postgres_database_default_list }}"
   roles:
+    # Setup storage
     - role: storage
       tags: ["storage"]
 
@@ -62,6 +63,10 @@
         postgres_users: "{{ postgres_database_users }}"
         postgres_databases: "{{ postgres_database_list }}"
         postgres_replication_role: "{{ subdomain_instance_role | default('standalone') }}"
+      tags: ["database", "postgres"]
+
+    # PostgreSQL Citus stup
+    - role: postgres/citus
       tags: ["database", "postgres"]
 
     # Configure PostgreSQL logging

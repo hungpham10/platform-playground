@@ -1,0 +1,30 @@
+es_version: 8.2.3
+es_heap_size: 1g
+es_cluster_name: "elasticsearch"
+
+es_default_users:
+  - username: admin
+    password: rootroot
+    email: admin@example.com
+    roles:
+      - admin
+
+es_default_roles:
+  - role: admin
+    cluster:
+      - monitor  # Bắt buộc cho /_cluster/health
+      - manage   # Cho setup/management
+    indices:
+      - names: "*"
+        privileges:
+          - all
+    metadata:
+      description: "Custom admin role with full access"
+
+es_config:
+  cluster.name: "{{ es_cluster_name }}"
+  node.roles: "{{ roles_list }}"
+  network.host: 0.0.0.0
+  http.port: 9200
+  discovery.seed_hosts: "{{ groups['elasticsearch-nodes'] }}"
+  cluster.initial_master_nodes: "{{ groups['elasticsearch-master'] }}"

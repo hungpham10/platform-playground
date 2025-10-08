@@ -1,0 +1,9 @@
+instances:
+{% for host in groups['elasticsearch-nodes'] %}
+  - name: "{{ host }}"
+    dns:
+      - "{{ host }}"
+      - "localhost"
+    ip:
+      - "{{ hostvars[host]['ansible_host'] }}"
+{% endfor %}
