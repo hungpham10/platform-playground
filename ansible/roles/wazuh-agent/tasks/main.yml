@@ -1,0 +1,82 @@
+---
+- include_tasks: "RedHat.yml"
+  when: ansible_os_family == "RedHat"
+
+- include_tasks: "Debian.yml"
+  when: ansible_os_family == "Debian"
+
+- name: Linux Debian | Install wazuh-agent
+  apt:
+    name: "wazuh-agent={{ wazuh_agent_version }}"
+    state: present
+    cache_valid_time: 3600
+  when:
+    - ansible_os_family|lower != "redhat"
+  environment:
+    WAZUH_MANAGER: "{{ wazuh_manager }}"
+    WAZUH_AGENT_GROUP: "{{ wazuh_agent_group }}"
+
+- name: Linux | Ensure group "wazuh" exists
+  ansible.builtin.group:
+    name: wazuh
+    state: present
+
+- name: check if docker already installed
+  stat: path=/usr/bin/docker
+  register: docker_bin
+
+- name: install pip docker
+  block:
+    - name: install python3-pip package
+      yum:
+        name: "python3-pip"
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: install python3-pip package
+      shell: sudo python3 -m easy_install install pip
+      when: ansible_os_family == 'Debian'
+
+    - name: install pip docker
+      pip:
+        name: docker
+        executable: pip3
+
+  when: docker_bin.stat.exists == True
+
+- name: Update auditd configuration
+  template:
+    src: "audit.rules.j2"
+    dest: "/etc/audit/rules.d/audit.rules"
+    mode: 0600
+
+- name: restart auditd
+  shell: augenrules --load && service auditd restart
+
+- name: check init.d script if systemd exists
+  stat: path=/etc/rc.d/init.d/wazuh-agent
+  register: wazuh_initd_exists
+
+- name: Remove init.d script if systemd exists
+  shell: rm -f /etc/rc.d/init.d/wazuh-agent
+  when: wazuh_initd_exists.stat.exists == True
+
+- name: systemd reload
+  systemd:
+    daemon_reload: yes
+
+- name: Copy cert file from local to remote
+  copy:
+    src: "{{ wazuh_agent_ssl_manager }}" 
+    dest: /var/ossec/etc/sslmanager.cert
+    owner: root                         
+    group: root                         
+    mode: '0600'                        
+    backup: yes
+  when: wazuh_agent_ssl_manager is defined
+
+- name: Linux | Ensure Wazuh Agent service is started and enabled
+  service:
+    name: wazuh-agent
+    enabled: true
+    state: started

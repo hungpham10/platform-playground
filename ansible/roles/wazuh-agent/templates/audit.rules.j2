@@ -1,0 +1,13 @@
+#
+# {{ ansible_managed }}
+#
+# Remove any existing rules
+-D
+# Buffer Size
+-b 8192
+# Failure Mode
+## Possible values: 0 (silent), 1 (printk, print a failure message), 2 (panic, halt the system)
+-f 1
+# Monitor file execution via execve --> output to wazuh channel
+-a exit,always -F arch=b32 -S execve -k audit-wazuh-c
+-a exit,always -F arch=b64 -S execve -k audit-wazuh-c

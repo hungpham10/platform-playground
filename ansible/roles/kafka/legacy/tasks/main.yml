@@ -1,0 +1,145 @@
+- name: Set kafka_node_id fact for all kafka nodes
+  ansible.builtin.set_fact:
+    kafka_node_id: "{{ groups['kafka-nodes'].index(inventory_hostname) + 1 }}"
+  delegate_to: "{{ inventory_hostname }}"
+  when: inventory_hostname in groups['kafka-nodes']
+
+- name: Setup zookeeper
+  block:
+    - name: Initialize zookeeper_quorum_voters list
+      set_fact:
+        zookeeper_quorum_voters: []
+
+    - name: Build zookeeper_quorum_voters list
+      set_fact:
+        zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (hostvars[item]['kafka_node_id'] | string) + '=' + hostvars[item]['inventory_hostname'] + ':2888:3888'] }}"
+      loop: "{{ groups['controllers'] }}"
+
+    - name: Download and extract Zookeeper
+      get_url:
+        url: "https://archive.apache.org/dist/zookeeper/zookeeper-{{ zookeeper_version }}/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+        dest: "/tmp/zookeeper.tar.gz"
+        mode: '0644'
+
+    - name: Unarchive package
+      unarchive:
+        src: "/tmp/zookeeper.tar.gz"
+        dest: "/tmp/"
+        remote_src: yes
+        owner: zookeeper
+        group: zookeeper
+
+    - name: Rename Zookeeper folder to /opt/zookeeper
+      command: mv /tmp/apache-zookeeper-{{ zookeeper_version }}-bin /opt/zookeeper
+      args:
+        creates: /opt/zookeeper
+        removes: /tmp/apache-zookeeper-{{ zookeeper_version }}-bin
+      become: yes
+      when:
+        - zookeeper_version is defined
+ 
+    - name: Create Zookeeper directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: zookeeper
+        group: zookeeper
+      loop:
+        - "{{ zookeeper_home }}"
+        - "{{ zookeeper_data_dir }}"
+
+    - name: Set Zookeeper ID
+      copy:
+        content: "{{ kafka_node_id }}"
+        dest: "{{ zookeeper_data_dir }}/myid"
+        owner: zookeeper
+        group: zookeeper
+
+    - name: Render Zookeeper service
+      template:
+        src: zookeeper.service.j2
+        dest: /etc/systemd/system/zookeeper.service
+      notify: Daemon reload
+
+    - name: Render Zookeeper config
+      template:
+        src: zookeeper.cfg.j2
+        dest: "{{ zookeeper_home }}/conf/zoo.cfg"
+      notify: Restart zookeeper
+
+    - name: Start ZooKeeper service
+      systemd:
+        name: zookeeper
+        state: started
+        enabled: true
+  when: inventory_hostname in groups['controllers']
+
+- name: Setup zookeeper
+  block:
+    - name: Download and extract Kafka
+      get_url:
+        url: "https://archive.apache.org/dist/kafka/{{ kafka_minor }}/kafka_{{ kafka_major }}-{{ kafka_minor }}.tgz"
+        dest: "/tmp/kafka.tgz"
+        mode: '0644'
+
+    - name: Unarchive package
+      unarchive:
+        src: "/tmp/kafka.tgz"
+        dest: "/tmp/"
+        remote_src: yes
+        owner: kafka
+        group: kafka
+
+    - name: Check if source Kafka folder exists
+      stat:
+        path: /tmp/kafka_{{ kafka_major }}-{{ kafka_minor }}
+      register: kafka_folder_stat
+      when:
+        - kafka_major is defined
+        - kafka_minor is defined
+
+    - name: Rename Kafka folder to /opt/kafka
+      command: mv /tmp/kafka_{{ kafka_major }}-{{ kafka_minor }} /opt/kafka
+      args:
+        creates: /opt/kafka
+        removes: /tmp/kafka_{{ kafka_major }}-{{ kafka_minor }}
+      become: yes
+      when:
+        - kafka_major is defined
+        - kafka_minor is defined
+        - kafka_folder_stat.stat.exists
+
+    - name: Create directories for Kafka
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: kafka
+        group: kafka
+      loop:
+        - "{{ kafka_install_dir }}"
+        - "{{ kafka_data_dir }}"
+        - "{{ kafka_config_dir }}"
+
+    - name: Create Kafka service file
+      template:
+        src: kafka.service.j2
+        dest: /etc/systemd/system/kafka.service
+      notify: Daemon reload
+
+    - name: Render Kafka properties
+      template:
+        src: server.properties.j2
+        dest: "{{ kafka_config_dir }}/server.properties"
+      notify: Restart kafka
+
+    - name: Reload systemd daemon
+      systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Kafka service
+      systemd:
+        name: kafka
+        enabled: yes
+        state: started
+      notify: Restart kafka
+  when: inventory_hostname in groups['brokers']

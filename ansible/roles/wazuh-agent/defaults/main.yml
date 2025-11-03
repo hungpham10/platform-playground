@@ -1,0 +1,11 @@
+wazuh_agent_version: 4.4.5
+
+wazuh_repo:
+  apt: 'deb https://packages.wazuh.com/4.x/apt/ stable main'
+  yum: 'https://packages.wazuh.com/4.x/yum/'
+  gpg: 'https://packages.wazuh.com/key/GPG-KEY-WAZUH'
+  key_id: '0DCFCA5547B19D2A6099506096B3EE5F29111145'
+
+wazuh_manager: wazuh-manager.tiki.services
+
+wazuh_agent_group: 'DC_VMs_Zone'

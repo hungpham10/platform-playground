@@ -4,8 +4,14 @@ role_users:
       uid: 2003
       groups: ['kafka']
       ssh_keys: []
+    - name: zookeeper
+      uid: 2005
+      groups: ['zookeeper', 'kafka']
+      ssh_keys: []
 
 role_groups:
   eventdriver:
     - name: kafka
       gid: 2003
+    - name: zookeeper
+      gid: 2005

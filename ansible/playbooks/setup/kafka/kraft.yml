@@ -1,5 +1,5 @@
 ---
-- import_playbook: ../boilerplate.yml
+- import_playbook: ../../boilerplate.yml
 
 - name: Configure Kafka Instance
   hosts: kafka-*
@@ -14,29 +14,31 @@
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       loop:
-        - "../../group_vars/all"
-        - "../../group_vars/{{ instance_role }}"
+        - "../../../group_vars/all"
+        - "../../../group_vars/{{ instance_role }}"
       tags: ["always"]
 
     - name: Check if host_vars directory exists
       ansible.builtin.stat:
-        path: "../../host_vars/{{ inventory_hostname }}"
+        path: "../../../host_vars/{{ inventory_hostname }}"
       register: host_vars_dir
       tags: ["always"]
 
     - debug:
-        msg: "../../host_vars/{{ inventory_hostname }}"
+        msg: "../../../host_vars/{{ inventory_hostname }}"
 
     - name: Include host specific variables
       include_vars:
-        dir: "../../host_vars/{{ inventory_hostname }}"
+        dir: "../../../host_vars/{{ inventory_hostname }}"
         ignore_unknown_extensions: true
         extensions: ['yml', 'yaml']
       when: host_vars_dir.stat.exists
       tags: ["always"]
 
   roles:
-    - role: kafka
+    - role: kafka/kraft
+      vars:
+        kind: "server"
       tags: ["kafka"]
 
   post_tasks:

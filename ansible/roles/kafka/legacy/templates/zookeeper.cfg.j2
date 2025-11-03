@@ -1,0 +1,13 @@
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir={{ zookeeper_data_dir }}
+clientPort=2181
+maxClientCnxns=60
+clientPortAddress=0.0.0.0
+quorumListenOnAllIPs=true
+
+{% for server in zookeeper_quorum_voters %}
+{{ server }}
+{% endfor %}
+

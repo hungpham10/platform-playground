@@ -1,0 +1,35 @@
+---
+- name: Debian/Ubuntu | Install apt-transport-https, ca-certificates, gnupg and acl
+  apt:
+    name:
+      - apt-transport-https
+      - ca-certificates
+      - acl
+      - gnupg
+    state: present
+
+- name: Debian/Ubuntu | Installing Wazuh repository key
+  apt_key:
+    url: "{{ wazuh_repo.gpg }}"
+    id: "{{ wazuh_repo.key_id }}"
+
+- name: Debian/Ubuntu | Add Wazuh repositories
+  apt_repository:
+    filename: wazuh_repo
+    repo: "{{ wazuh_repo.apt }}"
+    state: present
+    update_cache: true
+
+- name: Debian/Ubuntu | Install OpenJDK 1.8
+  apt: name=openjdk-8-jre state=present cache_valid_time=3600
+
+- name: install auditd
+  apt:
+    name: auditd
+    state: present
+
+- name: enable auditd service
+  service:
+    name: auditd
+    state: started
+    enabled: yes

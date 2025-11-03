@@ -1,0 +1,86 @@
+---
+- import_playbook: ../../boilerplate.yml
+
+- name: Configure Kafka Instance
+  hosts: kafka-*
+  become: true
+  vars:
+    instance_role: eventdriver
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../../group_vars/all"
+        - "../../../group_vars/{{ instance_role }}"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - debug:
+        msg: "../../../host_vars/{{ inventory_hostname }}"
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    - role: kafka/legacy
+      tags: ["kafka"]
+
+  post_tasks:
+    - name: Check if failover-test topic exists
+      ansible.builtin.shell:
+        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --list --topic failover-test"
+      become_user: kafka
+      register: topic_check
+      retries: 3
+      delay: 5
+      until: topic_check.rc == 0
+      run_once: true
+      changed_when: false
+      ignore_errors: true
+
+    - name: Create test topic for failover (replication factor = num controllers)
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
+      become_user: kafka
+      run_once: true  # Chỉ chạy trên 1 node
+      register: topic_create
+      failed_when: topic_create.rc != 0 and 'TopicAlreadyExists' not in topic_create.stderr
+      when: "'failover-test' not in topic_check.stdout"
+    
+    - name: Produce test messages
+      ansible.builtin.shell: |
+        set -o pipefail
+        for i in {1..10}; do
+          echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test
+        done
+      become_user: kafka
+      run_once: true
+      register: produce_result
+
+    - name: Consume and verify messages before failover
+      ansible.builtin.shell: |
+        set -o pipefail
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test --from-beginning --max-messages 10
+      become_user: kafka
+      run_once: true
+      register: consume_before
+      changed_when: false
+ 
+    - name: Debug pre-failover consumption
+      ansible.builtin.debug:
+        msg: "Messages before failover: {{ consume_before.stdout_lines }}"

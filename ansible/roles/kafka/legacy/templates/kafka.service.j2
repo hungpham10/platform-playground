@@ -1,0 +1,13 @@
+[Unit]
+Description=Apache Kafka Server
+Documentation=http://kafka.apache.org/documentation.html
+
+[Service]
+Type=simple
+User=kafka
+Environment="KAFKA_HEAP_OPTS=-Xmx512m -Xms512m"
+ExecStart=/opt/kafka/bin/kafka-server-start.sh /opt/kafka/config/legacy/server.properties
+ExecStop=/opt/kafka/bin/kafka-server-stop.sh
+
+[Install]
+WantedBy=multi-user.target

@@ -5,4 +5,10 @@ firewall_rules:
       comment: "Kafka controller"
     - port: 9092
       comment: "Kafka broker"
+    - port: 2181
+      comment: "Zookeeper client"
+    - port: 2888
+      comment: "Zookeeper Leader Election Follower Connection"
+    - port: 3888
+      comment: "Zookeeper Leader Election"
   custom: []
