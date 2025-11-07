@@ -56,12 +56,13 @@ resource "local_file" "cloud_init_user_data_file" {
     disks              = jsonencode(var.disks)
     privkey            = base64encode(length(var.tls_key.privkey) == 0 ? tls_private_key.internal[0].private_key_openssh : var.tls_key.privkey)
     pubkey             = length(var.tls_key.pubkey) == 0 ? tls_private_key.internal[0].public_key_openssh : var.tls_key.pubkey
+    username           = var.username
     telegram_bot_token = var.telegram.token
     telegram_chat_id   = var.telegram.chat_id
 
     # @NOTE: render bootloader script from our utilities, this will be used
     #        to boot our system
-    bootloader_sh_content = base64gzip(data.local_file.bootloader_sh.content)
+    bootloader_sh_content       = base64gzip(data.local_file.bootloader_sh.content)
     bootloader_arguments_in_str = join(
       flatten([
         # @NOTE: control network type
