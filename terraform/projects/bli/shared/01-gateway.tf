@@ -1,5 +1,5 @@
 module "gateway" {
-  source             = "../modules/proxmox/node"
+  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
   name               = "${var.name}-gateway"
   bastion            = var.bastion
   proxmox            = var.proxmox

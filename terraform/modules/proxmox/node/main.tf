@@ -43,9 +43,29 @@ provider "proxmox" {
 locals {
   max_number_of_node = var.networks[0].ip_end - var.networks[0].ip_beg
   metric             = min(var.metric, local.max_number_of_node)
-  recreate           = var.debug || var.recreate
-  ipconfig0          = "ip=${var.networks[0].ip_range}/${var.netmask.short},gw=${var.networks[0].gateway}"
   need_waiting       = !var.flags.enable_elastic_network && var.flags.enable_notify_when_done 
+}
+
+module "ip" {
+  source   = "../ip"
+  networks = var.networks
+  netmask  = var.netmask
+  proxmox  = var.proxmox
+}
+
+module "inventory" {
+  source    = "../inventory"
+  username  = var.username
+  password  = var.password
+  role      = var.node_type
+  net       = var.node_type
+  networks  = module.ip.network[0]
+  instances = flatten([
+    for i in range(0, local.metric): [
+      "${var.format}-${var.node_type}-${var.name}-${i + 1}"
+    ]
+  ])
+  variables = var.variables
 }
 
 # Setup cloudinit configuration
@@ -68,8 +88,6 @@ module "cloudinit" {
   disks                     = var.disks
   networks                  = var.networks
   flags                     = var.flags
-  instruction_folder        = var.instruction_folder
-  infrastructure_config_map = var.infrastructure_config_map
 }
 
 # Deploy a new node using proxmox
@@ -151,7 +169,7 @@ resource "proxmox_vm_qemu" "node" {
 
   # Setup the ip address using cloud-init.
   # Keep in mind to use the CIDR notation for the ip.
-  ipconfig0 = var.flags.enable_elastic_network ? "ip=dhcp" : format(local.ipconfig0, var.networks[0].ip_beg + count.index * var.proxmox.cluster.size + var.proxmox.cluster.id)
+  ipconfig0 = var.flags.enable_elastic_network ? "ip=dhcp" : module.ip.ipconfigs[0][count.index * var.proxmox.cluster.size + var.proxmox.cluster.id]
 
   # Custom proxmox node by using cloud-init
   cicustom = module.cloudinit.vendor[count.index * var.proxmox.cluster.size + var.proxmox.cluster.id]
@@ -165,10 +183,6 @@ resource "proxmox_vm_qemu" "node" {
       disk
     ]
   }
-
-  # Force to recreate new node if git commit apply
-  force_recreate_on_change_of = null #redisdb_hash.incrementer[count.index].hash["counter"]
-  force_create                = local.recreate
 }
 
 data "tfe_organization" "org" {

@@ -37,23 +37,6 @@ variable "playbooks" {
   })
 }
 
-variable "gateway" {
-  type = object({
-    cpu:    number
-    memory: number
-    disks:  list(object({
-    }))
-    ip_beg: object({
-      internet: string
-      internal: string
-    })
-    ip_end: object({
-      internet: string
-      internal: string
-    })
-  })
-}
-
 variable "total_partition" {
   type = number
 }
@@ -112,3 +95,41 @@ variable "internal" {
 variable "ifaces" {
   type = list(string)
 }
+
+// ---------------------------------------- //
+variable "gateway" {
+  type = object({
+    cpu:    number
+    memory: number
+    metric: number
+    disks:  list(object({
+    }))
+    ip_beg: object({
+      internet: string
+      internal: string
+    })
+    ip_end: object({
+      internet: string
+      internal: string
+    })
+  })
+}
+
+variable "postgres" {
+  type = object({
+    cpu:    number
+    memory: number
+    metric: number
+    disks:  list(object({
+    }))
+    ip_beg: object({
+      internet: string
+      internal: string
+    })
+    ip_end: object({
+      internet: string
+      internal: string
+    })
+  })
+}
+
