@@ -1,0 +1,36 @@
+
+upstream elasticsearch_ssl {
+    server {{ es_host }}:{{ es_http_port }};
+    keepalive 15;
+}
+
+server {
+    listen {{ nginx_port }};
+    server_name {{ nginx_server_name }};
+    
+{% if nginx_outbound_ssl is defined %}
+    # Redirect HTTP to HTTPS
+    return 301 https://$host$request_uri;
+{% endif %}
+}
+
+{% if nginx_outbound_ssl is defined %}
+server {
+    listen {{ nginx_ssl_port }} ssl http2;
+    server_name {{ nginx_server_name }};
+
+    # SSL setup
+    ssl_certificate {{ nginx_outbound_ssl.cert }};
+    ssl_certificate_key {{ nginx_outbound_ssl.key }};
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+}
+{% endif %}

@@ -268,3 +268,9 @@
       register: users_check
       when: es_admin_pass != "" and (es_users | length > 0)
   when: inventory_hostname == groups['elasticsearch-master'][0]
+
+- name: Render config www in nginx for Elasticsearch
+  template:
+    src: www.conf.j2
+    dest: "{{ nginx_home }}/conf.d/www.conf"
+  notify: Restart nginx

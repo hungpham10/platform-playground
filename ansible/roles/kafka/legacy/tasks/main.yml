@@ -1,25 +1,53 @@
+- name: Ensure Kafka version is bellow 4.0
+  fail:
+    msg: "Kafka version {{ kafka_minor }} is older than 3.3. Minimum required version is 3.3."
+  when: kafka_minor is version('4.0', '>=')
+
 - name: Set kafka_node_id fact for all kafka nodes
   ansible.builtin.set_fact:
     kafka_node_id: "{{ groups['kafka-nodes'].index(inventory_hostname) + 1 }}"
   delegate_to: "{{ inventory_hostname }}"
   when: inventory_hostname in groups['kafka-nodes']
 
+- name: Initialize zookeeper_quorum_voters list
+  set_fact:
+    zookeeper_quorum_voters: []
+
+- name: Build zookeeper_quorum_voters list from user defintion
+  set_fact:
+    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (item['id'] | string) + '=' + item['hostname'] + ':2888:3888'] }}"
+  loop: "{{ zookeeper_servers }}"
+  when: zookeeper_servers is defined
+
+- name: Build zookeeper_quorum_voters list from Ansible group
+  set_fact:
+    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (hostvars[item]['kafka_node_id'] | string) + '=' + (hostvars[item]['hostname'] | default(hostvars[item]['inventory_hostname'])) + ':2888:3888'] }}"
+  loop: "{{ groups['controllers'] }}"
+
 - name: Setup zookeeper
   block:
-    - name: Initialize zookeeper_quorum_voters list
-      set_fact:
-        zookeeper_quorum_voters: []
-
-    - name: Build zookeeper_quorum_voters list
-      set_fact:
-        zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (hostvars[item]['kafka_node_id'] | string) + '=' + hostvars[item]['inventory_hostname'] + ':2888:3888'] }}"
-      loop: "{{ groups['controllers'] }}"
+    - name: Check if file exists in local 'files' folder
+      stat:
+        path: "{{ role_path }}/files/softwares/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+      register: file_check_result
+      delegate_to: localhost
+      become: false
 
     - name: Download and extract Zookeeper
       get_url:
         url: "https://archive.apache.org/dist/zookeeper/zookeeper-{{ zookeeper_version }}/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
         dest: "/tmp/zookeeper.tar.gz"
         mode: '0644'
+      when: not file_check_result.stat.exists
+
+    - name: Copy zooekeeper
+      copy:
+        src: "softwares/apache-zookeeper-{{ zookeeper_version }}-bin.tar.gz"
+        dest: "/tmp/zookeeper.tar.gz"
+        owner: kafka
+        group: kafka
+        mode: '0640'
+      when: file_check_result.stat.exists
 
     - name: Unarchive package
       unarchive:
@@ -67,20 +95,62 @@
         dest: "{{ zookeeper_home }}/conf/zoo.cfg"
       notify: Restart zookeeper
 
+    - name: Render Zookeeper log4j
+      template:
+        src: zookeeper.log4j.properties.j2
+        dest: "{{ zookeeper_home }}/conf/log4j.properties"
+      notify: Restart zookeeper
+
     - name: Start ZooKeeper service
       systemd:
         name: zookeeper
         state: started
         enabled: true
+
+    - name: Wait until port 2181 starts listening on the remote host
+      wait_for:
+        port: 2181
+        state: started
+        timeout: 300  # Wait up to 5 minutes; adjust if needed
+        delay: 5
+
+    - name: Wait until port 3888 starts listening on the remote host
+      wait_for:
+        port: 3888
+        state: started
+        timeout: 300  # Wait up to 5 minutes; adjust if needed
+        delay: 5
+      when: (zookeeper_quorum_voters | length) > 1
   when: inventory_hostname in groups['controllers']
 
-- name: Setup zookeeper
+- name: Setup kafka
   block:
+    - name: Set kafka_advertised_hostname
+      set_fact:
+        kafka_advertised_hostname: "{{ hostname | default(inventory_hostname) }}"
+
+    - name: Check if file exists in local 'files' folder
+      stat:
+        path: "{{ role_path }}/files/softwares/kafka_{{ kafka_major }}-{{ kafka_minor }}.tgz"
+      register: file_check_result
+      delegate_to: localhost
+      become: false
+
     - name: Download and extract Kafka
       get_url:
         url: "https://archive.apache.org/dist/kafka/{{ kafka_minor }}/kafka_{{ kafka_major }}-{{ kafka_minor }}.tgz"
         dest: "/tmp/kafka.tgz"
         mode: '0644'
+      when: not file_check_result.stat.exists
+
+    - name: Copy kafka
+      copy:
+        src: "softwares/kafka_{{ kafka_major }}-{{ kafka_minor }}.tgz"
+        dest: "/tmp/kafka.tgz"
+        owner: kafka
+        group: kafka
+        mode: '0640'
+      when: file_check_result.stat.exists
 
     - name: Unarchive package
       unarchive:
@@ -119,6 +189,153 @@
         - "{{ kafka_install_dir }}"
         - "{{ kafka_data_dir }}"
         - "{{ kafka_config_dir }}"
+        - "{{ kafka_ssl_dir }}"
+
+    - name: Copy certificate from local to brokers
+      block:
+        - name: Copy truststore file
+          copy:
+            src: "ssl/kafka.truststore.p12"
+            dest: "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.truststore.destination }}"
+            owner: kafka
+            group: kafka
+            mode: '0640'
+
+        - name: Copy keystore file
+          copy:
+            src: "ssl/kafka.keystore.p12"
+            dest: "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.keystore.destination }}"
+            owner: kafka
+            group: kafka
+            mode: '0640'
+
+        - name: Copy CA certificate file
+          copy:
+            src: "ssl/ca-cert.pem"
+            dest: "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.ca_cert.destination }}"
+            owner: kafka
+            group: kafka
+            mode: '0640'
+
+        - name: Copy CA certificate file
+          copy:
+            src: "ssl/broker-cert.pem"
+            dest: "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.broker_cert.destination }}"
+            owner: kafka
+            group: kafka
+            mode: '0640'
+
+        - name: Validate CA certificate format
+          command: "openssl x509 -in {{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.ca_cert.destination }} -text -noout"
+          register: ca_cert_validation
+          failed_when: false
+
+        - name: Show CA certificate details
+          debug:
+            msg: |
+              CA Certificate Validation:
+                - Valid format: {{ ca_cert_validation.rc == 0 | ternary('YES', 'NO') }}
+                - Subject: {{ ca_cert_validation.rc == 0 | ternary((ca_cert_validation.stdout | regex_search('Subject:.*')), 'N/A') }}
+                - Issuer: {{ ca_cert_validation.rc == 0 | ternary((ca_cert_validation.stdout | regex_search('Issuer:.*')), 'N/A') }}
+                - Expiry: {{ ca_cert_validation.rc == 0 | ternary((ca_cert_validation.stdout | regex_search('Not After.*')), 'N/A') }}
+
+        - name: Validate keystore password and contents
+          command: >
+            keytool -list -v -keystore "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.keystore.destination }}"
+            -storepass "{{ kafka_cluster_certificate.keystore.password }}" -storetype PKCS12
+          register: keystore_validation
+          failed_when: false
+          ignore_errors: yes
+
+        - name: Show keystore details
+          debug:
+            msg: |
+              Broker Keystore Validation:
+                - Valid password: {{ keystore_validation.rc == 0 | ternary('YES', 'NO') }}
+                - Contains private key: {{ keystore_validation.rc == 0 | ternary('YES', 'N/A') }}
+                - Certificate chain: {{ keystore_validation.rc == 0 | ternary('PRESENT', 'N/A') }}
+
+        - name: Show keystore aliases if valid
+          debug:
+            msg: "Keystore aliases: {{ keystore_validation.stdout | regex_findall('Alias name:.*') }}"
+          when: keystore_validation.rc == 0
+
+
+        - name: Validate truststore password and contents
+          command: >
+            keytool -list -v -keystore "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.truststore.destination }}"
+              -storepass "{{ kafka_cluster_certificate.truststore.password }}" -storetype PKCS12
+          register: truststore_validation
+          failed_when: false
+          ignore_errors: yes
+
+        - name: Show truststore details
+          debug:
+            msg: |
+              Truststore Validation:
+                - Valid password: {{ truststore_validation.rc == 0 | ternary('YES', 'NO') }}
+                - Number of certificates: {{ truststore_validation.rc == 0 | ternary((truststore_validation.stdout | regex_findall('Alias name:.*') | length), 'N/A') }}
+
+        - name: Show truststore aliases if valid
+          debug:
+            msg: "Truststore aliases: {{ truststore_validation.stdout | regex_findall('Alias name:.*') }}"
+          when: truststore_validation.rc == 0
+
+        - name: Extract certificate from keystore
+          command: >
+            keytool -exportcert -alias kafka-broker -keystore "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.keystore.destination }}"
+              -storepass "{{ kafka_cluster_certificate.keystore.password }}" -storetype PKCS12 -rfc
+          register: broker_cert_extract
+          failed_when: false
+          ignore_errors: yes
+
+        - name: Verify certificate chain with CA
+          command: >
+            openssl verify -CAfile "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.ca_cert.destination }}" -
+          register: chain_validation
+          failed_when: false
+          when: broker_cert_extract.rc == 0
+          changed_when: false
+
+        - name: Show chain validation result
+          debug:
+            msg: |
+              Certificate Chain Validation:
+                - Broker cert extraction: {{ broker_cert_extract.rc == 0 | ternary('SUCCESS', 'FAILED') }}
+                - Chain validation: {{ chain_validation.rc == 0 | ternary('VALID', 'INVALID') }}
+                - Validation output: {{ chain_validation.stdout }}
+
+        - name: Check certificate SANs include all required hostnames
+          shell: |
+            openssl pkcs12 -in "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.keystore.destination }}" -passin pass:{{ kafka_cluster_certificate.keystore.password }} -nokeys -nodes 2>/dev/null | openssl x509 -text -noout | grep -A 50 "X509v3 Subject Alternative Name"
+          register: cert_sans
+          changed_when: false
+
+        - name: Verify all required hostnames are present
+          fail:
+            msg: "Certificate missing required hostname: {{ item }}"
+          when: item not in cert_sans.stdout
+          loop: "{{ groups['brokers'] }}"
+
+        - name: Verify certificate chain
+          shell: |
+            openssl verify -CAfile "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.ca_cert.destination }}" "{{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.broker_cert.destination }}"
+          failed_when: false
+          register: chain_verify
+
+        - name: Fail if certificate chain invalid
+          fail:
+            msg: "Certificate chain validation failed: {{ chain_verify.stdout }}"
+          when: chain_verify.rc != 0
+
+        - name: Render client properties
+          template:
+            src: client.properties.j2
+            dest: "{{ kafka_config_dir }}/client.properties"
+            owner: kafka
+            group: kafka
+            mode: '0640'
+      when: kafka_cluster_certificate is defined
 
     - name: Create Kafka service file
       template:

@@ -15,7 +15,7 @@
   set_fact:
     expected_hosts_content: |
       {% for host in groups['all'] %}
-      {{ hostvars[host]['ansible_host'] }} {{ hostvars[host]['inventory_hostname'] }} {{ hostvars[host]['inventory_hostname'] }}.{{ domain }} {{ hostvars[host]['inventory_hostname'] }}.{{ net }}.{{ domain }}
+      {{ hostvars[host]['ansible_host'] }} {{ hostvars[host]['hostname'] | default('') }} {{ hostvars[host]['inventory_hostname'] }} {{ hostvars[host]['inventory_hostname'] }}.{{ domain }} {{ hostvars[host]['inventory_hostname'] }}.{{ net }}.{{ domain }}
       {% endfor %}
 
 - name: Hostname | Get current hosts block content

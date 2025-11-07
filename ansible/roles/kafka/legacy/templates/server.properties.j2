@@ -1,5 +1,30 @@
+# File managed by Ansible. Manual changes will be lost. infra@tiki.vn
+
 broker.id={{ kafka_node_id }}
-listeners={{ kafka_advertised_listeners }}
+{% if kafka_cluster_certificate is defined %}
+# SSL Configuration for TLS listener
+listeners=PLAINTEXT://0.0.0.0:9092,TLS://0.0.0.0:9093
+listener.security.protocol.map=PLAINTEXT:PLAINTEXT,TLS:SSL
+advertised.listeners=PLAINTEXT://{{ kafka_advertised_hostname }}:9092,TLS://{{ kafka_advertised_hostname }}:9093
+
+# TLS Listener Configuration
+listener.name.tls.ssl.client.auth={{ kafka_tls_client_auth | default('required') }}
+
+listener.name.tls.ssl.truststore.location={{ kafka_ssl_dir }}/{{kafka_cluster_certificate.truststore.destination }}
+listener.name.tls.ssl.truststore.password={{ kafka_cluster_certificate.truststore.password }}
+listener.name.tls.ssl.truststore.type={{ kafka_cluster_certificate.truststore.type }}
+
+listener.name.tls.ssl.keystore.location={{ kafka_ssl_dir }}/{{ kafka_cluster_certificate.keystore.destination }}
+listener.name.tls.ssl.keystore.password={{ kafka_cluster_certificate.keystore.password }}
+listener.name.tls.ssl.keystore.type={{ kafka_cluster_certificate.keystore.type }}
+{% else %}
+listeners=PLAINTEXT://0.0.0.0:9092
+advertised.listeners=PLAINTEXT://{{ kafka_advertised_hostname }}:9092
+{% endif %}
+
+inter.broker.listener.name=PLAINTEXT
+inter.broker.protocol.version=2.0
+log.message.format.version=2.0
 
 zookeeper.connect={{ groups['controllers'] | join(':2181,') }}:2181
 zookeeper.connection.timeout.ms=6000
@@ -8,21 +33,24 @@ log.dirs={{ kafka_data_dir }}
 
 # Cấu hình topic
 num.partitions={{ kafka_num_partitions }}
+num.recovery.threads.per.data.dir={{ kafka_num_recovery_thread_per_data }}
+auto.create.topics.enable={{ kafka_auto_create_topic }}
+replica.fetch.max.bytes={{ kafka_replica_fetch_max }}
+message.max.bytes={{ kafka_message_max }}
 default.replication.factor={{ kafka_default_replication_factor }}
-offsets.topic.replication.factor={{ kafka_offsets_topic_replication_factor }}
-transaction.state.log.replication.factor={{ kafka_transaction_state_log_replication_factor }}
-transaction.state.log.min.isr={{ kafka_transaction_state_log_min_isr }}
-
 
 # Tối ưu hóa hiệu năng
 num.network.threads={{ kafka_num_network_threads }}
 num.io.threads={{ kafka_num_io_threads }}
-background.threads={{ kafka_background_threads }}
 queued.max.requests={{ kafka_queued_max_requests }}
+socket.send.buffer.bytes={{ kafka_socket_send_buffer }}
+socket.receive.buffer.bytes={{ kafka_socket_receive_buffer }}
+socket.request.max.bytes={{ kafka_socket_request_max }}
 
 # Cấu hình log retention
+log.retention.check.interval.ms={{ kafka_log_retention_check_interval }}
 log.retention.hours={{ kafka_log_retention_hours }}
 log.retention.bytes={{ kafka_log_retention_bytes }}
 log.segment.bytes={{ kafka_log_segment_bytes }}
-
-auto.create.topics.enable=true
+log.flush.interval.messages={{ kafka_log_flush_interval_messages }}
+log.flush.interval.ms={{ kafka_log_flush_interval_ms }}

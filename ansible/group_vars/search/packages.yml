@@ -1,12 +1,14 @@
 role_packages:
   search:
     yum:
+      - nginx
       - rsync
       - sshpass
       - unzip
       - java-17-openjdk
       - elasticsearch-{{ es_version }}
     apt:
+      - nginx
       - rsync
       - sshpass
       - unzip

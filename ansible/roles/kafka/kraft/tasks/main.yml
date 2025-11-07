@@ -1,5 +1,11 @@
 ---
+- name: Ensure Kafka version is 3.3 or greater
+  fail:
+    msg: "Kafka version {{ kafka_minor }} is older than 3.3. Minimum required version is 3.3."
+  when: kafka_minor is version('3.3', '<')
+
 - name: Set kafka_node_id fact for all kafka nodes
+
   ansible.builtin.set_fact:
     kafka_node_id: "{{ groups['kafka-nodes'].index(inventory_hostname) + 1 }}"
   delegate_to: "{{ inventory_hostname }}"

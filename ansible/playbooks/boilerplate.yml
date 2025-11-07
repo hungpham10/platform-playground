@@ -61,6 +61,7 @@
           - { name: net.ipv4.tcp_keepalive_intvl, value: "75" }
           - { name: net.ipv4.tcp_keepalive_probes, value: "9" }
           - { name: net.ipv4.tcp_syncookies, value: "1" }
+      when: (enable_sysctl | bool)
       tags: ["system"]
 
     - role: users
@@ -81,13 +82,14 @@
       tags: ["system", "users", "security"]
 
     - role: systemd-resolved
+      when: (enable_resolver | bool)
       tags: ["system", "network"]
 
     - role: pkg/yum
       vars:
         linux_add_packages_keys: >-
           {{
-            (base_package_keys.yum | default([])) +
+            ((base_package_keys.yum | default([])) if (enable_base_package | bool) else []) +
             (
               (role_package_keys[subdomain_instance_role].yum | default([]))
               if instance_role == "gateway"
@@ -97,7 +99,7 @@
           }}
         linux_add_packages_repositories: >-
           {{
-            (base_package_repos.yum | default([])) +
+            ((base_package_repos.yum | default([])) if (enable_base_package | bool) else []) +
             (
               (role_package_repos[subdomain_instance_role].yum | default([]))
               if instance_role == "gateway"
@@ -107,7 +109,7 @@
           }}
         linux_add_packages_names: >-
           {{
-            (base_packages.yum | default([])) +
+            ((base_packages.yum | default([])) if (enable_base_package | bool) else [])+
             (
               (role_packages[subdomain_instance_role].yum | default([]))
               if instance_role == "gateway"
@@ -117,7 +119,7 @@
           }}
         linux_add_public_signing_keys: >-
           {{
-            (base_public_signing_keys.yum | default([])) +
+            ((base_public_signing_keys.yum | default([])) if (enable_base_package | bool) else []) +
             (
               (role_public_signing_keys[subdomain_instance_role].yum | default([]))
               if instance_role == "gateway"
@@ -132,7 +134,7 @@
       vars:
         linux_add_packages_keys: >-
           {{
-            (base_package_keys.apt | default([])) +
+            ((base_package_keys.apt | default([])) if (enable_base_package | bool) else [])+
             (
               (role_package_keys[subdomain_instance_role].apt | default([]))
               if instance_role == "gateway"
@@ -142,7 +144,7 @@
           }}
         linux_add_packages_repositories: >-
           {{
-            (base_package_repos.apt | default([])) +
+            ((base_package_repos.apt | default([])) if (enable_base_package | bool) else [])+
             (
               (role_package_repos[subdomain_instance_role].apt | default([]))
               if instance_role == "gateway"
@@ -152,7 +154,7 @@
           }}
         linux_add_packages_names: >-
           {{
-            (base_packages.apt | default([])) +
+            ((base_packages.apt | default([])) if (enable_base_package | bool) else [])+
             (
               (role_packages[subdomain_instance_role].apt | default([]))
               if instance_role == "gateway"
@@ -162,7 +164,7 @@
           }}
         linux_add_public_signing_keys: >-
           {{
-            (base_public_signing_keys.apt | default([])) +
+            ((base_public_signing_keys.apt | default([])) if (enable_base_package | bool) else [])+
             (
               (role_public_signing_keys[subdomain_instance_role].apt | default([]))
               if instance_role == "gateway"
@@ -178,6 +180,7 @@
         is_gateway_machine: "{{ instance_role == 'gateway' }}"
         net_interfaces: "{{ network_interfaces }}"
         enable_forwarding: "{{ network_defaults.enable_forwarding }}"
+      when: (enable_netplan | bool)
       tags: ["network"]
 
     - role: hostname
@@ -208,6 +211,7 @@
         firewall_allowed_tcp_ports: "{{ firewall_rules.tcp_ports | default([]) }}"
         firewall_allowed_udp_ports: "{{ firewall_rules.udp_ports | default([]) }}"
         firewall_additional_rules: "{{ firewall_rules.custom | default([]) }}"
+      when: (enable_firewall | bool)
       tags: ["security", "firewall"]
 
     - role: vpn
@@ -238,6 +242,7 @@
             else (groups['gateway'][0] if (groups['gateway'] is defined and ntp_defaults.use_gateway_server) 
             else ntp_defaults.upstream_servers)
           }}
+      when: (enable_ntp | bool)
       tags: ["system", "time"]
 
     - role: storage
@@ -245,20 +250,22 @@
         storage_devices: "{{ instance_storage.devices | default([]) }}"
         storage_vgs: "{{ instance_storage.vgs | default([]) }}"
         storage_lvs: "{{ instance_storage.lvs | default([]) }}"
+      when: (enable_storage | bool)
       tags: ["storage"]
 
-    #- role: audit
-    #  vars:
-    #    audit_rules: "{{ audit_rules | default([]) }}"
-    #    audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
-    #    audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
-    #    audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
-    #    audit_num_logs: "{{ audit_num_logs | default(5) }}"
-    #    audit_space_left: "{{ audit_space_left | default(75) }}"
-    #    audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
-    #    audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
-    #    audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
-    #  tags: ["security", "audit"]
+    - role: audit
+      vars:
+        audit_rules: "{{ audit_rules | default([]) }}"
+        audit_log_path: "{{ audit_log_path | default('/var/log/audit/audit.log') }}"
+        audit_max_log_file: "{{ audit_max_log_file | default(8) }}"
+        audit_max_log_file_action: "{{ audit_max_log_file_action | default('rotate') }}"
+        audit_num_logs: "{{ audit_num_logs | default(5) }}"
+        audit_space_left: "{{ audit_space_left | default(75) }}"
+        audit_space_left_action: "{{ audit_space_left_action | default('email') }}"
+        audit_admin_space_left: "{{ audit_admin_space_left | default(50) }}"
+        audit_admin_space_left_action: "{{ audit_admin_space_left_action | default('single') }}"
+      when: (enable_audit | bool)
+      tags: ["security", "audit"]
 
     - role: users
       vars:
@@ -277,17 +284,21 @@
         user_password_salt: "{{ user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
       tags: ["system", "users", "security"]
 
-    #- role: hardening
-    #  vars:
-    #    security_required_packages: "{{ security_packages | default([]) }}"
-    #    sysctl_security_params: "{{ sysctl_params | default([]) }}"
-    #    password_policies: "{{ password_default_policies | default([]) }}"
-    #    remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
-    #    enable_aide: "{{ enable_file_integrity | default(false) }}"
-    #    aide_rules: "{{ file_integrity_rules | default([]) }}"
-    #    audit_rules: "{{ system_audit_rules | default([]) }}"
-    #  tags: ["security", "hardening"]
-  
+    - role: hardening
+      vars:
+        security_required_packages: "{{ security_packages | default([]) }}"
+        sysctl_security_params: "{{ sysctl_params | default([]) }}"
+        password_policies: "{{ password_default_policies | default([]) }}"
+        remove_suid_sgid_files: "{{ suid_sgid_files | default([]) }}"
+        enable_aide: "{{ enable_file_integrity | default(false) }}"
+        aide_rules: "{{ file_integrity_rules | default([]) }}"
+        audit_rules: "{{ system_audit_rules | default([]) }}"
+      when: (enable_hardening | bool)
+      tags: ["security", "hardening"]
+
+    - role: alloy
+      tags: ["monitoring"]
+
   post_tasks:
     - name: Verify all services are running
       service_facts:
@@ -318,4 +329,5 @@
             success_msg: "Mount point {{ item.item.mount_point }} is configured correctly"
           loop: "{{ mount_status.results }}"
           when: item is not skipped
+      when: (enable_storage | bool)
       tags: ["verify", "storage"]

@@ -1,0 +1,36 @@
+zookeeper_version: "3.5.9"
+zookeeper_home: "/opt/zookeeper"
+zookeeper_install_dir: "/opt/zookeeper"
+zookeeper_data_dir: "/var/lib/zookeeper"
+
+kafka_minor: "2.8.2"
+kafka_major: "2.13"
+kafka_home: "/opt/kafka"
+kafka_install_dir: "/opt/kafka"
+kafka_data_dir: "/var/lib/kafka"
+kafka_ssl_dir: "{{ kafka_install_dir }}/ssl"
+kafka_config_dir: "{{ kafka_install_dir }}/config"
+
+# Cấu hình topic
+kafka_num_partitions: 3
+kafka_num_recovery_thread_per_data: 1
+kafka_replica_fetch_max: 5242880
+kafka_message_max: 5242880
+kafka_auto_create_topic: false
+kafka_default_replication_factor: 2
+
+# Tối ưu hóa hiệu năng
+kafka_num_network_threads: 5
+kafka_num_io_threads: 10
+kafka_queued_max_requests: 5000
+kafka_socket_request_max: 104857600
+kafka_socket_send_buffer: 102400
+kafka_socket_receive_buffer: 102400
+
+# Cấu hình log retention
+kafka_log_retention_hours: 24
+kafka_log_retention_bytes: -1
+kafka_log_retention_check_interval: 300000
+kafka_log_segment_bytes: 1073741824
+kafka_log_flush_interval_messages: 10000
+kafka_log_flush_interval_ms: 1000

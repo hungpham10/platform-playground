@@ -83,3 +83,6 @@ services/validate/node_modules/
 /target
 vendor
 *.json
+ssl/
+secrets/
+softwares/

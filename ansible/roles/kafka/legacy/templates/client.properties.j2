@@ -1,0 +1,13 @@
+# File managed by Ansible. Manual changes will be lost.
+
+security.protocol=SSL
+ssl.truststore.location={{ kafka_ssl_dir }}/kafka.truststore.p12
+ssl.truststore.password={{ kafka_cluster_certificate.truststore.password }}
+ssl.truststore.type=PKCS12
+
+{% if kafka_cluster_certificate.keystore is defined %}
+ssl.keystore.location={{ kafka_ssl_dir }}/kafka.keystore.p12
+ssl.keystore.password={{ kafka_cluster_certificate.keystore.password }}
+ssl.keystore.type=PKCS12
+{% endif %}
+

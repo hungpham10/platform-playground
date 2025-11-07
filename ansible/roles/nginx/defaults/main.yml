@@ -1,0 +1,2 @@
+nginx_ssl_dir: "/etc/nginx/ssl/"
+nginx_home: "/etc/nginx/"

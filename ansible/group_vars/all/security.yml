@@ -1,15 +1,10 @@
 ---
 # VPN Configuration
+enable_vpn: false
 vpn_defaults:
   server_endpoint: "vpn.example.com"
   allowed_ips: "10.8.0.0/24"
   client_address: "10.8.0.2/24"
-
-# Firewall defaults
-firewall_defaults:
-  state: enabled
-  log_dropped: true
-  forward_policy: DROP
 
 # Password policy configuration
 password_default_policies:

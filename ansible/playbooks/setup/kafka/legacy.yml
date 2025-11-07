@@ -24,9 +24,6 @@
       register: host_vars_dir
       tags: ["always"]
 
-    - debug:
-        msg: "../../../host_vars/{{ inventory_hostname }}"
-
     - name: Include host specific variables
       include_vars:
         dir: "../../../host_vars/{{ inventory_hostname }}"
@@ -39,10 +36,66 @@
     - role: kafka/legacy
       tags: ["kafka"]
 
+    # Configure Kafka logging
+    - role: logrotate
+      vars:
+        logrotate_custom_entries:
+          - name: kafka
+            path: "/var/log/kafka.log"
+            frequency: daily
+            options:
+              - rotate 7
+              - daily
+              - missingok
+              - notifempty
+              - compress
+              - delaycompress
+            rsyslog: 
+              program_name: kafka-server-start.sh
+              id: 30
+            create: "0640 root adm"
+            postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
+          - name: zookeeper
+            path: "/var/log/zookeeper.log"
+            frequency: daily
+            options:
+              - rotate 7
+              - daily
+              - missingok
+              - notifempty
+              - compress
+              - delaycompress
+            rsyslog: 
+              program_name: zkServer.sh
+              id: 30
+            create: "0640 root adm"
+            postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
+      tags: ["monitoring"]
+
   post_tasks:
+    - name: Test PLAINTEXT port 9092
+      ansible.builtin.shell:
+        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --list"
+      become_user: kafka
+      register: test_plaintext
+      changed_when: false
+
+    - name: Test SSL port 9093
+      ansible.builtin.shell:
+        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9093 --list --command-config {{ kafka_config_dir }}/client.properties"
+      become_user: kafka
+      register: test_ssl
+      changed_when: false
+
+    - name: Display test results
+      debug:
+        msg:
+          - "PLAINTEXT (9092): {{ 'OK' if test_plaintext.rc == 0 else 'FAILED' }}"
+          - "SSL (9093): {{ 'OK' if test_ssl.rc == 0 else 'FAILED' }}"
+
     - name: Check if failover-test topic exists
       ansible.builtin.shell:
-        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --list --topic failover-test"
+        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --list --topic failover-test"
       become_user: kafka
       register: topic_check
       retries: 3
@@ -55,7 +108,7 @@
     - name: Create test topic for failover (replication factor = num controllers)
       ansible.builtin.shell: |
         set -o pipefail
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
       become_user: kafka
       run_once: true  # Chỉ chạy trên 1 node
       register: topic_create
@@ -66,7 +119,7 @@
       ansible.builtin.shell: |
         set -o pipefail
         for i in {1..10}; do
-          echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test
+          echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --topic failover-test
         done
       become_user: kafka
       run_once: true
@@ -75,7 +128,7 @@
     - name: Consume and verify messages before failover
       ansible.builtin.shell: |
         set -o pipefail
-        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test --from-beginning --max-messages 10
+        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --topic failover-test --from-beginning --max-messages 10
       become_user: kafka
       run_once: true
       register: consume_before
@@ -84,3 +137,49 @@
     - name: Debug pre-failover consumption
       ansible.builtin.debug:
         msg: "Messages before failover: {{ consume_before.stdout_lines }}"
+
+    - name: Test if SSL is enabled
+      block:
+        - name: Test message production via SSL
+          ansible.builtin.shell:
+            cmd: |
+              echo "SSL test message $(date)" | /opt/kafka/bin/kafka-console-producer.sh \
+                --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9093 \
+                --topic failover-test \
+                --producer.config {{ kafka_config_dir }}/client.properties
+          become_user: kafka
+          register: ssl_produce_test
+          changed_when: false
+        
+        - name: Test message consumption via SSL
+          ansible.builtin.shell:
+            cmd: |
+              timeout 10s /opt/kafka/bin/kafka-console-consumer.sh \
+                --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9093 \
+                --topic failover-test \
+                --from-beginning \
+                --max-messages 1 \
+                --consumer.config {{ kafka_config_dir }}/client.properties
+          become_user: kafka
+          register: ssl_consume_test
+          changed_when: false
+          failed_when: false
+        
+        - name: Display consumption test result
+          debug:
+            msg: "SSL consumption test: {{ 'SUCCESS' if ssl_consume_test.rc == 0 else 'NO MESSAGES' }} - {{ ssl_consume_test.stdout }}"
+
+        - name: Test broker connection via SSL from all nodes
+          ansible.builtin.shell:
+            cmd: |
+              /opt/kafka/bin/kafka-broker-api-versions.sh \
+                --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9093 \
+                --command-config {{ kafka_config_dir }}/client.properties
+          become_user: kafka
+          register: broker_api_test
+          changed_when: false
+        
+        - name: Display broker API versions
+          debug:
+            msg: "Broker API versions test: {{ 'SUCCESS' if broker_api_test.rc == 0 else 'FAILED' }}"
+      when:

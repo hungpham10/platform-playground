@@ -1,0 +1,100 @@
+---
+- name: Configure Kafka Instance
+  hosts: kafka-*
+  become: true
+  vars:
+    instance_role: eventdriver
+    zookeeper_port: 2181
+    kafka_broker_port: 9092
+    kafka_bin_path: /opt/kafka/bin
+    zookeeper_bin_path: /opt/zookeeper/bin
+
+    # @NOTE: for test traffic only
+    test_topic: ansible_test_topic
+    test_message: "Ansible Kafka Test Message"
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../../../group_vars/all"
+        - "../../../../group_vars/{{ instance_role }}"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  tasks:
+    - name: Sanitize test for Kafka
+      block:
+        - name: List Kafka topics
+          command: "{{ kafka_bin_path }}/kafka-topics.sh --list --bootstrap-server localhost:{{ kafka_broker_port }}"
+          register: kafka_topics
+          ignore_errors: true
+
+        - name: Report Kafka topics
+          debug:
+            msg: "Kafka topics: {{ kafka_topics.stdout_lines }}"
+
+        - name: Check Kafka logs for errors
+          command: grep -i error /var/log/kafka/server.log | tail -n 10
+          register: kafka_errors
+          ignore_errors: true
+
+        - name: Report recent Kafka errors
+          debug:
+            msg: "Recent errors in Kafka log: {{ kafka_errors.stdout_lines }}"
+          when: kafka_errors.stdout_lines | length > 0
+
+    - name: Sanitize test for Zookeeper
+      block:
+        - name: Check Zookeeper health with ruok
+          command: echo ruok | nc localhost {{ zookeeper_port }}
+          register: zk_health
+          ignore_errors: true
+
+        - name: Report Zookeeper health
+          debug:
+            msg: "Zookeeper health: {{ zk_health.stdout }} (Expected: imok) on {{ inventory_hostname }}"
+          when: zk_health.rc == 0
+      when: inventory_hostname in groups['controllers']
+
+    - name: Test traffic
+      block:
+        - name: Create test topic
+          command: "{{ kafka_bin_path }}/kafka-topics.sh --create --topic {{ test_topic }} --bootstrap-server localhost:{{ kafka_broker_port }} --partitions 1 --replication-factor 1"
+          register: create_topic
+          ignore_errors: true
+
+        - name: Produce test message
+          command: echo "{{ test_message }}" | "{{ kafka_bin_path }}/kafka-console-producer.sh --topic {{ test_topic }} --bootstrap-server localhost:{{ kafka_broker_port }}"
+          when: create_topic.rc == 0 or 'already exists' in create_topic.stderr
+
+        - name: Consume test message
+          command: "{{ kafka_bin_path }}/kafka-console-consumer.sh --topic {{ test_topic }} --bootstrap-server localhost:{{ kafka_broker_port }} --from-beginning --max-messages 1 --timeout-ms 5000"
+          register: consume_message
+          when: create_topic.rc == 0 or 'already exists' in create_topic.stderr
+
+        - name: Verify test message
+          debug:
+            msg: "Test message received: {{ consume_message.stdout }} (Expected: {{ test_message }})"
+          when: consume_message.rc == 0
+
+        - name: Delete test topic
+          command: "{{ kafka_bin_path }}/kafka-topics.sh --delete --topic {{ test_topic }} --bootstrap-server localhost:{{ kafka_broker_port }}"
+          ignore_errors: true
+          when: create_topic.rc == 0 or 'already exists' in create_topic.stderr

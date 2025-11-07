@@ -1,0 +1,29 @@
+- name: Check if the service unit file exists
+  stat:
+    path: /usr/lib/systemd/system/alloy.service
+  register: service_status
+
+- name: Setup alloy as agent for each instance
+  block:
+    - name: Render Alloy enviroments for RedHat family OS
+      template:
+        src: alloy.env.j2
+        dest: /etc/sysconfig/alloy
+      when: ansible_os_family == "RedHat"
+
+    - name: Render Alloy enviroments for Debian family OS
+      template:
+        src: alloy.env.j2
+        dest: /etc/default/alloy
+      when: ansible_os_family == "Debian"
+
+    - name: Render Alloy config
+      template:
+        src: alloy-scraping.conf.j2
+        dest: /etc/alloy/config.alloy
+      notify: Restart alloy
+  when:
+    - service_status.stat.exists
+    - kind is undefined
+    - prometheus is defined
+

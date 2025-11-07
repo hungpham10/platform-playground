@@ -1,4 +1,6 @@
 ---
+enable_audit: false
+
 # Audit configuration
 audit_default_rules:
   # System calls

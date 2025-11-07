@@ -1,0 +1,29 @@
+
+{% if metrics is defined %}
+prometheus.scrape "default" {
+  targets = [
+{% for metric in metrics %}
+    {
+      "__address__" = "{{ metric }}"
+    },
+{% endfor %}
+  ]
+
+  forward_to = [
+     prometheus.remote_write.prom.receiver
+  ]
+}
+{% endif %}
+
+{% if prometheus is defined %}
+prometheus.remote_write "prom" {
+  endpoint {
+    url = "{{ prometheus.endpoint }}" 
+  }
+
+  basic_auth {
+    username = "{{ prometheus.username }}"
+    password = "{{ prometheus.password }}"
+  }
+}
+{% endif %}
