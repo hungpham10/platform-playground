@@ -27,7 +27,7 @@ variable "installer" {
 }
 
 variable "flags" {
-  description = ""
+  description = "Feature flags"
   type        = object({
     use_elastic_network: bool
     use_notify_when_done: bool
@@ -69,16 +69,38 @@ variable "topdir" {
 variable "metric" {
   description = "The number of node dedicated to be deployed to cloud"
   type        = number
-  default     = 1
 }
 
-variable "repository" {
-  description = "The ansible repository where is located playbooks to provision nodes"
+variable "artifact_host" {
+  description = "The gitlab host where is storing the ansible repository"
   type        = string
-  default     = ""
+  default     = "gitlab.alpaca.vn"
 }
 
-variable "branch" {
+variable "artifact_namespace" {
+  description = "The gitlab namespace where is storing the ansible repository"
+  type        = string
+  default     = "alpaca-projects%2Fdevops"
+}
+
+variable "artifact_project" {
+  description = "The gitlab project where is storing the ansible repository"
+  type        = string
+  default     = "alpaca-k8s-inhouse-cluster"
+}
+
+variable "project_id" {
+  description = "The ansible gitlab project_id repository where is located playbooks to provision nodes"
+  type        = string
+  default     = "266"
+}
+
+variable "access_token" {
+  description = "The dedicated access token which will be provided to client as serials to prove license for our products"
+  type        = string
+}
+
+variable "tag" {
   description = "The ansible repository's branch where which will be used to promote the new infrastructure"
   type        = string
 }
@@ -86,7 +108,6 @@ variable "branch" {
 variable "playbook" {
   description = "The ansible playbook which is used to provision nodes"
   type        = string
-  default     = ""
 }
 
 variable "tls_key" {
@@ -99,6 +120,11 @@ variable "tls_key" {
     pubkey  = ""
     privkey = ""
   }
+}
+
+variable "inventory" {
+  description = "The inventory configuration"
+  default     = {}
 }
 
 variable "telegram" {
@@ -132,26 +158,6 @@ variable "proxmox" {
   })
 }
 
-variable "vault" {
-  description = "Vault client secret and project name to access configuration from outside"
-  type = object({
-    enabled : bool
-    secret : string
-    id : string
-    project : string
-    application : string
-    organization : string
-  })
-  default = {
-    enabled      = false
-    secret       = ""
-    id           = ""
-    project      = ""
-    application  = ""
-    organization = ""
-  }
-}
-
 variable "iptables" {
   description = "The iptables api server which is used to configure the node's firewall"
   type = object({
@@ -166,13 +172,3 @@ variable "iptables" {
   }
 }
 
-variable "infrastructure_config_map" {
-  description = "The infrastructure config map which is used to configure the whole cluster"
-  type = string
-  default = ""
-}
-
-variable "instruction_folder" {
-  description = "The folder whhich contains everything to help to setup and configure connectivity between nodes"
-  type        = string
-}

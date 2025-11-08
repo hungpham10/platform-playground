@@ -1,9 +1,3 @@
-variable "tfe" {
-  type = object({
-    token: string
-  })
-}
-
 variable "proxmox" {
   type = object({
     api : string
@@ -27,9 +21,6 @@ variable "topdir" {
   type        = string
 }
 
-// -------------------------------------------------- //
-//
-// -------------------------------------------------- //
 variable "name" {
   description = "The cluster name"
   type        = string
@@ -46,16 +37,14 @@ variable "node_type" {
   type        = string
 }
 
-variable "username" {
-  description = "The default username for the OS"
+variable "playbook" {
+  description = "Which playbook will be used to start services"
   type        = string
-  default     = "vagrant"
 }
 
-variable "password" {
-  description = "The password for the the default user for the OS"
-  type        = string
-  default     = "vagrant"
+variable "inventory" {
+  description = "The inventory configuration"
+  default     = {}
 }
 
 variable "tls_key" {
@@ -70,15 +59,6 @@ variable "tls_key" {
   }
 }
 
-variable "variables" {
-  description = "List of variables"
-  default     = {}
-}
-// -------------------------------------------------- //
-
-// -------------------------------------------------- //
-//
-// -------------------------------------------------- //
 variable "metric" {
   description = "The number of node dedicated to be deployed to cloud"
   type        = number
@@ -233,4 +213,3 @@ variable "flags" {
     use_statefulset_strategy = false
   }
 }
-// -------------------------------------------------- //

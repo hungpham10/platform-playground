@@ -17,18 +17,18 @@ function error() {
 
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${domain}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"    \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${domain}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
-	exit -1
+	exit 1
 }
 
 function error_with_log() {
-  curl -X POST                                                                                                                                                \
-       -H "Content-Type: application/json"                                                                                                                    \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${domain}: ${1}\nReason:\\n\", \"disable_notification\": false}" \
+  curl -X POST                                                                                                                      \
+       -H "Content-Type: application/json"                                                                                          \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${domain}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
   curl -v -F "chat_id=${telegram_chat_id}" -F document=@$2 https://api.telegram.org/bot${telegram_bot_token}/sendDocument
-	exit -1
+	exit 1
 }
 
 function cleanup() {
@@ -163,14 +163,11 @@ function init_using_installer() {
 
 function init() {
   # Build ansible playbook from our template
-  if ! cp -av /tmp/playbook/pkg/configuration/playbook/${playbook} /etc/ansible/; then
-    error "fail copying /tmp/playbook/pkg/configuration/playbook/${playbook} to /etc/ansible"
+  if ! cp -av /tmp/playbook/ansible /etc/ansible/; then
+    error "fail copying /tmp/playbook/ansible to /etc/ansible"
   fi
-  if ! cp -av /tmp/playbook/pkg/configuration/group_vars /etc/ansible/; then
-    error "fail copying /tmp/playbook/pkg/configuration/group_vars to /etc/ansible/"
-  fi
-  if ! cp -av /tmp/playbook/pkg/configuration/roles /etc/ansible/; then
-    error "fail copying /tmp/playbook/pkg/configuration/roles to /etc/ansible/"
+  if ! cp -av /tmp/inventory.json /etc/ansible/; then
+    error "fail copying /tmp/inventory.json to /etc/ansible"
   fi
 
   # Generate ssh-key and copy to our ansible playbook
@@ -183,28 +180,8 @@ function init() {
   chmod 0600 /etc/ansible/id_rsa
   chmod 0600 /etc/ansible/id_rsa.pub
 
-  # Copy instance description to our ansible playbook
-  if ! cp -av /tmp/hosts /etc/ansible/hosts; then
-    error "fail copying /tmp/hosts to /etc/ansible/hosts"
-  fi
-  if ! cp -av /tmp/network /etc/ansible/network; then
-    error "fail copying /tmp/network to /etc/ansible/network"
-  fi
-  if ! cp -av /tmp/storage /etc/ansible/storage; then
-    error "fail copying /tmp/storage to /etc/ansible/storage"
-  fi
-
   mkdir -p /usr/local/{bin,lib}
   mkdir -p /usr/local/lib/devops
-
-  # Copy conventional scripts to support for operating system
-  if ! cp -av /tmp/utilities/bin/* /usr/local/bin/; then
-    error "fail copying /tmp/utilities/* to /usr/local/bin/"
-  fi
-
-  if ! cp -av /tmp/utilities/lib/* /usr/local/lib/devops; then
-    error "fail copying /tmp/utilities/* to /usr/local/lib/devops"
-  fi
 
   if [ "${use_alpaca_agent}" = "true" ]; then
     # Copy agent and setup agent service to run in each instance
@@ -247,9 +224,8 @@ function perform_setup_playbook_without_agent() {
     error "Please configure $infrastructure_config_yaml_path"
   fi
 
-  if ! ansible-playbook -i /etc/ansible/hosts /etc/ansible/${playbook}                                                                                          \
-            --private-key /etc/ansible/id_rsa                                                                                                                   \
-            --extra-vars "@$infrastructure_config_yaml_path"
+  if ! ansible-playbook -i /etc/ansible/inventory.json /etc/ansible/${playbook}                                         \
+            --private-key /etc/ansible/id_rsa                                                                           \
             --tags setup --skip-tags always &> /tmp/ansible.log; then
         REASON=$(tac /var/log/cloud-init-output.log | awk '/PLAY RECAP/,/TASK /' | tac - | tr '\r\n' ' ' | tr '\"' "'")
     if ! echo "$REASON" | grep "FAILED\|failed\|fatal"; then

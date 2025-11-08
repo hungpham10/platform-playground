@@ -14,6 +14,16 @@ variable "networks" {
   }))
 }
 
+variable "nameservers" {
+  description = ""
+  type = list(string)
+  default = [
+    "1.1.1.1",
+    "8.8.8.8",
+    "4.4.4.4"
+  ]
+}
+
 variable "metric" {
   description = "Number of instance"
   type        = number

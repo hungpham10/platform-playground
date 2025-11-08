@@ -25,29 +25,25 @@ generate "main" {
   if_exists         = "overwrite"
   disable_signature = true
   contents          = <<EOF
-variable "proxmox" {
-  description = "The proxmox configuration"
-  type = object({
-    api : string
-    host : string
-    port : number
-    node : string
-    token : string
-    timeout : number
-    secret : string
-    bridge : string
-    password : string
-    private_key : string
-    cluster : object({
-      size : number
-      id : number
-    })
-  })
+module "common" {
+  source          = "./shared"
+  bastion         = "" 
+  name            = ${jsonencode(local.configs.locals.workspace)}
+  vmid            = ${jsonencode(local.configs.locals.vmid)}
+  total_partition = ${jsonencode(local.configs.locals.total_partition)}
+  proxmox         = ${jsonencode(local.configs.locals.proxmox)}
+  internet        = ${jsonencode(local.configs.locals.internet)}
+  internal        = ${jsonencode(local.configs.locals.internal)}
+  gateway         = ${jsonencode(local.configs.locals.gateway)}
+  postgres        = ${jsonencode(local.configs.locals.postgres)}
 }
 
-module "common" {
-  source      = "./shared"
-  proxmox     = var.proxmox
+output "postgres" {
+  value = module.common.postgres
+}
+
+output "gateway" {
+  value = module.common.gateway
 }
 EOF
 }
