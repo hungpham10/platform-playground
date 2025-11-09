@@ -5,13 +5,7 @@ output "ip_list" {
 
 output "ip_with_netmask_list" {
   description = "The list of IP addresses which are created after nodes have been promoted"
-  value       = [
-    for i in range(0, length(var.networks)): flatten([
-      for ip in local.ip_list[i]: [
-        "${ip}/${var.netmask}"
-      ]
-    ])
-  ]
+  value       = local.ip_with_netmask_list[0]
 }
 
 output "netmask" {
@@ -24,22 +18,12 @@ output "ipconfigs" {
   value       = local.ipconfigs
 }
 
-output "network" {
+output "interfaces" {
   description = "The network definition for Ansible"
-  value       = [
-    for j in range(0, length(var.networks)): flatten([
-      for i in range(0, var.metric): [
-        {
-          name        = var.networks[j].iface
-          gateway     = var.networks[j].gateway
-          nameservers = var.networks[j].namespaces
-          addresses   = [
-            local.ip_list[j][i]
-          ]
-          dhcp        = false
-          type        = "ethernet"
-        }
-      ]
-    ])
-  ]
+  value       = local.interfaces
+}
+
+output "networks" {
+  description = "The network definition for Terraform"
+  value       = var.networks
 }

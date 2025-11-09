@@ -1,16 +1,22 @@
 locals {
+  instances = flatten([
+    for i in range(0, var.metric): [
+      "${var.node_type}-${var.name}-${i + 1}"
+    ]
+  ])
+
   inventory = {
     all = {
       hosts = {
-        for i in range(0, var.metric) : var.instances[i] => merge(
+        for i in range(0, var.metric) : local.instances[i] => merge(
           {
-            ansible_host            = var.instances[i]
-            ansible_user            = var.username
-            ansible_password        = var.password
+            ansible_host            = join("", var.interfaces[i][0].addresses)
+            ansible_user            = module.env.username
+            ansible_password        = module.env.password
             instance_role           = var.role
             net                     = var.net
-            domain                  = var.instances[i]
-            network_interfaces      = var.network
+            domain                  = local.instances[i]
+            network_interfaces      = var.interfaces[i]
           },
           var.variables,
         )
@@ -18,3 +24,8 @@ locals {
     }
   }
 }
+
+module "env" {
+  source = "../env"
+}
+

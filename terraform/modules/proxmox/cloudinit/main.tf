@@ -24,23 +24,23 @@ data "local_file" "bootloader_sh" {
   filename = "${path.module}/bootloader.sh"
 }
 
-data "archive_file" "instruction_tar_gz" {
-  type        = "tar"
-  output_path = "${path.module}/instruction.tar.gz"
-
-  source {
-    content  = file("${var.instruction_folder}/agent")
-    filename = "agent"
-  }
-  source {
-    content  = file("${var.instruction_folder}/agent.db")
-    filename = "agent.db"
-  }
-  source {
-    content  = file("${var.instruction_folder}/agent.service")
-    filename = "agent.service"
-  }
-}
+//data "archive_file" "instruction_tar_gz" {
+//  type        = "tar"
+//  output_path = "${path.module}/instruction.tar.gz"
+//
+//  source {
+//    content  = file("${var.instruction_folder}/agent")
+//    filename = "agent"
+//  }
+//  source {
+//    content  = file("${var.instruction_folder}/agent.db")
+//    filename = "agent.db"
+//  }
+//  source {
+//    content  = file("${var.instruction_folder}/agent.service")
+//    filename = "agent.service"
+//  }
+//}
 
 resource "tls_private_key" "internal" {
   count     = var.metric > 0 ? 1 : 0
@@ -49,9 +49,10 @@ resource "tls_private_key" "internal" {
 }
 
 resource "local_file" "cloud_init_user_data_file" {
-  count = var.metric
+  count   = var.metric
   content = sensitive(templatefile("${path.module}/cloudinit.cfg", {
     # @NOTE: common configuration
+    fqdn               = "${var.format}-${var.node_type}-${var.name}-${count.index}"
     networks           = jsonencode(var.networks)
     disks              = jsonencode(var.disks)
     privkey            = base64encode(length(var.tls_key.privkey) == 0 ? tls_private_key.internal[0].private_key_openssh : var.tls_key.privkey)
@@ -64,18 +65,18 @@ resource "local_file" "cloud_init_user_data_file" {
     #        to boot our system
     bootloader_sh_content       = base64gzip(data.local_file.bootloader_sh.content)
     bootloader_arguments_in_str = join(
+      " ",
       flatten([
         # @NOTE: control network type
-        var.flags.use_elastic_network ? [] : format("--ip ${var.networks[0].ip_range}", var.networks[0].ip_beg + count.index),
+        var.flags.use_elastic_network ? "" : format("--ip ${var.networks[0].ip_range}", var.networks[0].ip_beg + count.index),
 
         # @NOTE: configure installer node where we provide central configuration
         length(var.installer) > 0 ? format("--tftp_server_ip", var.installer) : "",
 
         # @NOTE: common configuration
         format("--hostname %s", "${var.format}-${var.node_type}-${var.name}-${count.index}"),
-        format("--branch %s", "${var.branch}"),
         format("--playbook %s", "${var.playbook}"),
-        format("--use_alpaca_agent", var.flags.use_agent ? "true" : "false"),
+        format("--use_alpaca_agent %s", var.flags.use_agent ? "true" : "false"),
 
         # @NOTE: when done, notify status
         var.flags.use_notify_when_done ? [
@@ -86,16 +87,19 @@ resource "local_file" "cloud_init_user_data_file" {
         # @NOTE: specify configuration
         lookup(local.bootloader_arguments, var.node_type, local.bootloader_arguments["default"])
       ]),
-      " ",
     )
 
-    # @NOTE: pack ansible, current database created by agent and the agent itself
-    #        and shift it to server
-    instruction_tar_content = base64encode(file(data.archive_file.instruction_tar_gz.output_path))
+    # @NOTE: generate playbook.tar.gz as distributed version for dedicated clients
+    access_token       = var.access_token
+    project_id         = var.project_id
+    tag                = var.tag
+    artifact_host      = var.artifact_host
+    artifact_project   = var.artifact_project
+    artifact_namespace = var.artifact_namespace
 
     # @NOTE: generate infrastructure.yml directly from terraform, this happen when we try
     #        to build installer node
-    infrastructure_config_map = base64gzip(var.infrastructure_config_map)
+    inventory = base64gzip(jsonencode(var.inventory))
 
     # @NOTE: pass proxmox master to control where to access configuration
     proxmox_host     = var.proxmox.host

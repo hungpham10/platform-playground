@@ -13,10 +13,6 @@ terraform {
       source = "hashicorp/hcp"
       version = "0.91.0"
     }
-    null = {
-      source  = "hashicorp/null"
-      version = "3.2.1"
-    }
   }
 }
 
@@ -43,51 +39,48 @@ provider "proxmox" {
 locals {
   max_number_of_node = var.networks[0].ip_end - var.networks[0].ip_beg
   metric             = min(var.metric, local.max_number_of_node)
-  need_waiting       = !var.flags.enable_elastic_network && var.flags.enable_notify_when_done 
+  need_waiting       = !var.flags.use_elastic_network && var.flags.use_notify_when_done
+}
+
+module "env" {
+  source = "../env"
 }
 
 module "ip" {
   source   = "../ip"
+  metric   = local.metric
   networks = var.networks
   netmask  = var.netmask
   proxmox  = var.proxmox
 }
 
-module "inventory" {
-  source    = "../inventory"
-  username  = var.username
-  password  = var.password
-  role      = var.node_type
-  net       = var.node_type
-  networks  = module.ip.network[0]
-  instances = flatten([
-    for i in range(0, local.metric): [
-      "${var.format}-${var.node_type}-${var.name}-${i + 1}"
-    ]
-  ])
-  variables = var.variables
-}
-
 # Setup cloudinit configuration
 module "cloudinit" {
-  source                    = "../cloudinit"
-  name                      = var.name
-  topdir                    = var.topdir
-  username                  = var.username
-  password                  = var.password
-  node_type                 = var.node_type
-  metric                    = var.metric
-  branch                    = var.branch
-  repository                = var.repository
-  playbook                  = var.playbook
-  tls_key                   = var.tls_key
-  telegram                  = var.telegram
-  promtail                  = var.promtail
-  proxmox                   = var.proxmox
-  vault                     = var.vault
-  disks                     = var.disks
-  networks                  = var.networks
-  flags                     = var.flags
+  source       = "../cloudinit"
+  name         = var.name
+  topdir       = var.topdir
+  node_type    = var.node_type
+  metric       = var.metric
+  tls_key      = var.tls_key
+  proxmox      = var.proxmox
+  disks        = var.disks
+  networks     = var.networks 
+  playbook     = var.playbook
+  flags        = {
+    use_elastic_network = var.flags.use_elastic_network
+    use_notify_when_done = var.flags.use_notify_when_done
+    use_statefulset_strategy = var.flags.use_statefulset_strategy
+    use_agent = false
+  }
+
+  # @NOTE: serving only for admin to manage each instance in Alpaca cloud
+  username     = module.env.username
+  telegram     = module.env.telegram
+  promtail     = module.env.promtail
+
+  # @NOTE: provided by release engineer to each client
+  access_token = module.env.access_token
+  tag          = module.env.tag
 }
 
 # Deploy a new node using proxmox
@@ -164,12 +157,12 @@ resource "proxmox_vm_qemu" "node" {
   }
 
   # Setup cloud-init account
-  ciuser     = var.username
-  cipassword = var.password
+  ciuser     = module.env.username
+  cipassword = module.env.password
 
   # Setup the ip address using cloud-init.
   # Keep in mind to use the CIDR notation for the ip.
-  ipconfig0 = var.flags.enable_elastic_network ? "ip=dhcp" : module.ip.ipconfigs[0][count.index * var.proxmox.cluster.size + var.proxmox.cluster.id]
+  ipconfig0 = var.flags.use_elastic_network ? "ip=dhcp" : module.ip.ipconfigs[count.index * var.proxmox.cluster.size + var.proxmox.cluster.id][0]
 
   # Custom proxmox node by using cloud-init
   cicustom = module.cloudinit.vendor[count.index * var.proxmox.cluster.size + var.proxmox.cluster.id]
@@ -185,38 +178,13 @@ resource "proxmox_vm_qemu" "node" {
   }
 }
 
-data "tfe_organization" "org" {
-  name = var.tfe.organization
-}
-
-data "tfe_workspace" "project" {
-  name         = var.tfe.workspace
-  organization = data.tfe_organization.org.name
-}
-
-data "tfe_variables" "all-variables" {
-  workspace_id = data.tfe_workspace.project.id
-}
-
-resource "tfe_variable" "status" {
-  count        = contains(data.tfe_variables.all-variables.variables, "${var.format}-${var.node_type}-${var.name}") ? 0 : 1
-  key          = "${var.format}-${var.node_type}-${var.name}"
-  value        = "provisioned"
-  category     = "terraform"
-  workspace_id = data.tfe_workspace.project.id
-
-  depends_on = [
-    proxmox_vm_qemu.node
-  ]
-}
-
 resource "null_resource" "wait_for_finishing_installing_instances" {
   depends_on = [proxmox_vm_qemu.node]
   count      = local.need_waiting ? 1 : 0
 
   connection {
     type        = "ssh"
-    user        = var.username
+    user        = module.env.username
     host        = length(var.bastion) > 0 ? var.bastion : format(var.networks[0].ip_range, var.networks[0].ip_beg + count.index)
     private_key = module.cloudinit.private_key
   }
@@ -225,7 +193,7 @@ resource "null_resource" "wait_for_finishing_installing_instances" {
     when = create
     inline = [
       join("", [
-        length(var.bastion) > 0 ? "ssh -vvvv -o StrictHostKeyChecking=no -i /etc/ansible/id_rsa ${var.username}@${format(var.networks[0].ip_range, var.networks[0].ip_beg + count.index)} " : "",
+        length(var.bastion) > 0 ? "ssh -vvvv -o StrictHostKeyChecking=no -i /etc/ansible/id_rsa ${module.env.username}@${format(var.networks[0].ip_range, var.networks[0].ip_beg + count.index)} " : "",
         "cloud-init status --wait"
       ]),
     ]
