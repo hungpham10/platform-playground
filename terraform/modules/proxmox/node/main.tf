@@ -180,7 +180,7 @@ resource "proxmox_vm_qemu" "node" {
 
 resource "null_resource" "wait_for_finishing_installing_instances" {
   depends_on = [proxmox_vm_qemu.node]
-  count      = local.need_waiting ? 1 : 0
+  count      = length(var.bastion) > 0 && local.need_waiting ? 1 : 0
 
   connection {
     type        = "ssh"

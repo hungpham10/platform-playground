@@ -31,7 +31,7 @@
     group: "{{ item.group | default(omit) }}"
     groups: "{{ item.groups | default([]) }}"
     append: "{{ item.append | default(true) }}"
-    password: "{{ (item.password | default('')) | ternary(item.password | password_hash('sha512', (user_password_salt|default('mysalt123'))[:16]), omit) }}"
+    password: "{{ (item.password | password_hash('sha512', (user_password_salt|default('mysalt123'))[:16])) if (item.password | default('')) else omit }}"
     shell: "{{ item.shell | default('/bin/bash') }}"
     home: "{{ item.home | default('/home/' + item.name) }}"
     create_home: "{{ item.create_home | default(true) }}"

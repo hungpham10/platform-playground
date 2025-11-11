@@ -1,15 +1,14 @@
 module "gateway-inventory" {
-  source     = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/inventory?ref=main"
-  role       = "gateway"
+  source     = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/inventory?ref=3-fix-issue-teraform-module-using-wrong-name"
   net        = "gw"
-  name       = "gateway"
-  node_type  = "vm"
+  name       = var.name
+  node_type  = "gateway"
   metric     = var.gateway.metric
   interfaces = module.ip-gateway-internet.interfaces
 }
 
 module "ip-gateway-internet" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
   metric   = var.gateway.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -25,14 +24,14 @@ module "ip-gateway-internet" {
 }
 
 module "gateway" {
-  source          = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
-  name            = "${var.name}-gateway"
+  source          = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=3-fix-issue-teraform-module-using-wrong-name"
+  name            = var.name
   bastion         = var.bastion
   proxmox         = var.proxmox
   vmid            = var.vmid
   partition       = var.gateway.partition
   total_partition = var.total_partition
-  node_type       = "vm"
+  node_type       = "gateway"
   topdir          = path.module
   playbook        = "gateway"
   metric          = var.gateway.metric

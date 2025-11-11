@@ -17,7 +17,7 @@ function error() {
 
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${domain}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${hostname}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
 	exit 1
 }
@@ -25,7 +25,7 @@ function error() {
 function error_with_log() {
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${domain}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${hostname}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
   curl -v -F "chat_id=${telegram_chat_id}" -F document=@$2 https://api.telegram.org/bot${telegram_bot_token}/sendDocument
 	exit 1
@@ -39,30 +39,10 @@ function cleanup() {
   rm -fr /tmp/id_rsa.base64
 }
 
-function clone_playbook_from_git() {
-  # Clone our playbook and prepare structure of this ansible
-  if [[ ${#repository} -eq 0 ]]; then
-    error "missing repository"
-  fi
-
-  if ! git clone --branch $branch $repository /tmp/playbook; then
-    error "error cloning playbook, please ping SRE to validate network"
-  fi
-
-  # Compress playbook into playbook.tar.gz
-}
-
-function clone_agent_from_git() {
-  # Clone our playbook and prepare structure of this ansible
-  if [[ ${#repository} -eq 0 ]]; then
-    error "missing repository"
-  fi
-
-  if ! git clone --branch $branch $repository /tmp/agent; then
-    error "error cloning playbook, please ping SRE to validate network"
-  fi
-
-  # Build agent and compress it into agent.tar.gz
+function clone_playbook_from_local_storage() {
+  if ! tar -xzf /tmp/playbook.tar.gz -C /tmp; then
+    error "failed to extract /tmp/playbook.tar.gz to /tmp"
+  fi 
 }
 
 function clone_playbook_from_installer() {
@@ -148,9 +128,8 @@ EOF
   fi
 }
 
-function init_using_git() {
-  clone_agent_from_git
-  clone_playbook_from_git
+function init_using_local_storage() {
+  clone_playbook_from_local_storage
   init
 }
 
@@ -210,9 +189,11 @@ function init() {
 }
 
 function include_libraries() {
-  for LIB in $(ls -1c /usr/local/lib/devops/*.sh); do
-    source $LIB
-  done
+  if [ -d /usr/local/lib/devops ]; then
+    for LIB in $(ls -1c /usr/local/lib/devops/*.sh); do
+      source $LIB
+    done
+  fi
 }
 
 function setup_dependencies() {

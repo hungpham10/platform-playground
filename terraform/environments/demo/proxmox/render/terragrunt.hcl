@@ -13,7 +13,7 @@ inputs = {
 }
 
 terraform {
-  source = "${get_repo_root()}/terraform/projects//bli"
+  source = "${get_repo_root()}/terraform/projects/bli//"
 
   extra_arguments "terragrunt_generated_vars" {
     commands = "${get_terraform_commands_that_need_vars()}"
@@ -36,14 +36,6 @@ module "common" {
   internal        = ${jsonencode(local.configs.locals.internal)}
   gateway         = ${jsonencode(local.configs.locals.gateway)}
   postgres        = ${jsonencode(local.configs.locals.postgres)}
-}
-
-output "postgres" {
-  value = module.common.postgres
-}
-
-output "gateway" {
-  value = module.common.gateway
 }
 EOF
 }

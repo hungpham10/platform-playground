@@ -20,39 +20,39 @@ locals {
   postgres = {
     partition = 2
     cpu = 4
-    memory = 4
+    memory = 4096
     metric = 1
     disks =  []
     ip_beg = {
-      internet = 2
+      internet = 101
       internal = 2
     }
     ip_end = {
-      internet = 4
+      internet = 103
       internal = 4
     }
   }
 
   gateway  = {
-    partition = 2
+    partition = 1
     cpu = 1
-    memory = 4
+    memory = 4096
     metric = 1
     disks =  []
     ip_beg = {
-      internet = 1
+      internet = 100
       internal = 1
     }
     ip_end = {
-      internet = 2
+      internet = 101
       internal = 2
     }
   }
   
   internet = {
-    bridge   = "vmbr1"
-    gateway  = "192.168.1.1"
-    ip_range = "192.168.1.%d"
+    bridge   = "vmbr0"
+    gateway  = "192.168.2.1"
+    ip_range = "192.168.2.%d"
     netmask  = {
       long  = "255.255.255.0"
       short = "24"
@@ -61,9 +61,9 @@ locals {
   }
 
   internal = {
-    bridge   = "vmbr2"
-    gateway  = "192.168.2.1"
-    ip_range = "192.168.2.%d"
+    bridge   = "vmbr10"
+    gateway  = "10.188.10.1"
+    ip_range = "10.188.10.%d"
     netmask  = {
       long  = "255.255.255.0"
       short = "24"
