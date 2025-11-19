@@ -1,6 +1,6 @@
 ---
 # Default storage configuration
-enable_storage: true
+enable_storage: false
 
 storage_defaults:
   mount_options: defaults

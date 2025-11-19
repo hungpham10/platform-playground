@@ -1,6 +1,6 @@
 ---
 # Example of network configuration
-enable_netplan: true
+enable_netplan: false
 
 network_defaults:
   is_gateway_machine: false

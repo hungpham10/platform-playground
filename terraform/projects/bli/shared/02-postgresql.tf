@@ -33,11 +33,11 @@ locals {
 }
 
 module "env" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/env?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/env?ref=main"
 }
 
 module "ip-postgres-internet" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
   metric   = var.postgres.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -53,7 +53,7 @@ module "ip-postgres-internet" {
 }
 
 module "ip-postgres-internal" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
   metric   = var.postgres.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -69,7 +69,7 @@ module "ip-postgres-internal" {
 }
 
 //module "postgres" {
-//  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=3-fix-issue-teraform-module-using-wrong-name"
+//  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
 //  name               = var.name
 //  bastion            = var.bastion
 //  proxmox            = var.proxmox

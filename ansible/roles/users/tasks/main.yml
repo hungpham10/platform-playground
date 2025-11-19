@@ -33,7 +33,7 @@
     append: "{{ item.append | default(true) }}"
     password: >-
       {% if item.password is defined and item.password | length > 0 %}
-      {{ item.password | password_hash('sha512', user_password_salt | default('mysalt123') | string [:16]) }}
+      {{ item.password | password_hash('sha512', (user_password_salt | default('mysalt123') | string)[:16]) }}
       {% else %}
       {{ omit }}
       {% endif %}

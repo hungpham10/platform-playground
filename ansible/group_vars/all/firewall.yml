@@ -1,5 +1,5 @@
 ---
-enable_firewall: true
+enable_firewall: false
 
 # Firewall defaults
 firewall_defaults:

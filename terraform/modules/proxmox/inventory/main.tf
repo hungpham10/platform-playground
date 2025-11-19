@@ -1,7 +1,7 @@
 locals {
   instances = flatten([
     for i in range(0, var.metric): [
-      "${var.node_type}-${var.name}-${i + 1}"
+      "${var.format}-${var.node_type}-${var.name}-${i + 1}"
     ]
   ])
 

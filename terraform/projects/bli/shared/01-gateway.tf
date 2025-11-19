@@ -1,5 +1,5 @@
 module "gateway-inventory" {
-  source     = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/inventory?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source     = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/inventory?ref=main"
   net        = "gw"
   name       = var.name
   node_type  = "gateway"
@@ -8,7 +8,7 @@ module "gateway-inventory" {
 }
 
 module "ip-gateway-internet" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
   metric   = var.gateway.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -24,7 +24,7 @@ module "ip-gateway-internet" {
 }
 
 module "gateway" {
-  source          = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=3-fix-issue-teraform-module-using-wrong-name"
+  source          = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
   name            = var.name
   bastion         = var.bastion
   proxmox         = var.proxmox
