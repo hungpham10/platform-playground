@@ -17,7 +17,7 @@ function error() {
 
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${domain}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${hostname}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
 	exit 1
 }
@@ -25,7 +25,7 @@ function error() {
 function error_with_log() {
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
-       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${domain}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
+       -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${hostname}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
   curl -v -F "chat_id=${telegram_chat_id}" -F document=@$2 https://api.telegram.org/bot${telegram_bot_token}/sendDocument
 	exit 1
@@ -37,32 +37,6 @@ function cleanup() {
   rm -fr /tmp/id_rsa
   rm -fr /tmp/id_rsa.pub
   rm -fr /tmp/id_rsa.base64
-}
-
-function clone_playbook_from_git() {
-  # Clone our playbook and prepare structure of this ansible
-  if [[ ${#repository} -eq 0 ]]; then
-    error "missing repository"
-  fi
-
-  if ! git clone --branch $branch $repository /tmp/playbook; then
-    error "error cloning playbook, please ping SRE to validate network"
-  fi
-
-  # Compress playbook into playbook.tar.gz
-}
-
-function clone_agent_from_git() {
-  # Clone our playbook and prepare structure of this ansible
-  if [[ ${#repository} -eq 0 ]]; then
-    error "missing repository"
-  fi
-
-  if ! git clone --branch $branch $repository /tmp/agent; then
-    error "error cloning playbook, please ping SRE to validate network"
-  fi
-
-  # Build agent and compress it into agent.tar.gz
 }
 
 function clone_playbook_from_installer() {
@@ -148,9 +122,7 @@ EOF
   fi
 }
 
-function init_using_git() {
-  clone_agent_from_git
-  clone_playbook_from_git
+function init_using_local_storage() {
   init
 }
 
@@ -163,10 +135,10 @@ function init_using_installer() {
 
 function init() {
   # Build ansible playbook from our template
-  if ! cp -av /tmp/playbook/ansible /etc/ansible/; then
+  if ! cp -a /tmp/playbook/ansible /etc/ansible/; then
     error "fail copying /tmp/playbook/ansible to /etc/ansible"
   fi
-  if ! cp -av /tmp/inventory.json /etc/ansible/; then
+  if ! cp -a /tmp/inventory.json /etc/ansible/; then
     error "fail copying /tmp/inventory.json to /etc/ansible"
   fi
 
@@ -174,7 +146,7 @@ function init() {
   if ! base64 --decode /tmp/id_rsa.base64 | tee /etc/ansible/id_rsa; then
     error "fail decoding /tmp/id_rsa.base64 to /etc/ansible/id_rsa"
   fi
-  if ! cp -av /tmp/id_rsa.pub /etc/ansible/id_rsa.pub; then
+  if ! cp -a /tmp/id_rsa.pub /etc/ansible/id_rsa.pub; then
     error "fail copying /tmp/id_rsa.pub to /etc/ansible/"
   fi
   chmod 0600 /etc/ansible/id_rsa
@@ -185,7 +157,7 @@ function init() {
 
   if [ "${use_alpaca_agent}" = "true" ]; then
     # Copy agent and setup agent service to run in each instance
-    if ! cp -av /tmp/agent/agent /usr/local/bin/agent; then
+    if ! cp -a /tmp/agent/agent /usr/local/bin/agent; then
       error "fail copying /tmp/agent/agent to /usr/local/bin/agent"
     fi
     chmod +x /usr/local/bin/agent
@@ -210,23 +182,16 @@ function init() {
 }
 
 function include_libraries() {
-  for LIB in $(ls -1c /usr/local/lib/devops/*.sh); do
-    source $LIB
-  done
-}
-
-function setup_dependencies() {
-  pip3 install -r /etc/ansible/requirements.txt
+  if [ -d /usr/local/lib/devops ]; then
+    for LIB in $(ls -1c /usr/local/lib/devops/*.sh); do
+      source $LIB
+    done
+  fi
 }
 
 function perform_setup_playbook_without_agent() {
-  if [ ! -f "$infrastructure_config_yaml_path" ]; then
-    error "Please configure $infrastructure_config_yaml_path"
-  fi
-
   if ! ansible-playbook -i /etc/ansible/inventory.json /etc/ansible/${playbook}                                         \
-            --private-key /etc/ansible/id_rsa                                                                           \
-            --tags setup --skip-tags always &> /tmp/ansible.log; then
+            --private-key /etc/ansible/id_rsa &> /tmp/ansible.log; then
         REASON=$(tac /var/log/cloud-init-output.log | awk '/PLAY RECAP/,/TASK /' | tac - | tr '\r\n' ' ' | tr '\"' "'")
     if ! echo "$REASON" | grep "FAILED\|failed\|fatal"; then
       REASON=$(tail -100 /tmp/ansible.log)
@@ -259,6 +224,7 @@ branch="master"
 
 while [ $# -gt 0 ]; do
 	case $1 in
+    --debug)                           set -x;;
     --ip)                              ip="$2"; shift;;
     --size)                            size="$2"; shift;;
     --hostname)                        hostname="$2"; shift;;
@@ -285,7 +251,7 @@ if [ -f /etc/running ]; then
 fi
 
 # Execute steps
-IFS=';' read -r -a step_array <<< "$steps"
+IFS=',' read -r -a step_array <<< "$steps"
 
 for step in "${step_array[@]}"; do
   if [[ -n "$step" ]]; then

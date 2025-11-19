@@ -8,7 +8,7 @@ firewall_defaults:
   forward_policy: DROP
 
 # Default firewall rules
-firewall_default_rules:
+firewall_base_rules:
   tcp_ports:
     - port: 22    
       comment: "SSH"

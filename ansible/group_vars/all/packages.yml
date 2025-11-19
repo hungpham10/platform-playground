@@ -45,3 +45,4 @@ base_packages:
     - e2fsprogs
     - parted
     - alloy
+    - chrony

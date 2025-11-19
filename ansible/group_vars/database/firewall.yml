@@ -1,6 +1,28 @@
 
-firewall_rules:
-  tcp_ports:
-    - port: 5432
-      comment: "Postgresql server"
-  udp_ports: []
+firewall_default_rules:
+  postgres:
+    tcp_ports:
+      - port: 5432
+        comment: "Postgresql server"
+    udp_ports: []
+  scylladb:
+    tcp_ports:
+      - port: 7000
+        comment: "Scylla Internode communication"
+      - port: 7001
+        comment: "Scylla TLS Internode communication"
+      - port: 9160
+        comment: "Scylla RPC port"
+      - port: 9180
+        comment: "Scylla monitor"
+      - port: 9042
+        comment: "Scylla CQL native port"
+      - port: 9142
+        comment: "Scylla TLS CQL native port"
+      - port: 10000
+        comment: "Scylla REST API"
+      - port: 19042
+        comment: "Scylla Native shard-aware transport port"
+      - port: 19142
+        comment: "Scylla TLS Native shard-aware transport port"
+    udp_ports: []

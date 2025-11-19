@@ -2,14 +2,15 @@ locals {
   postgres_inventory = {
     all = {
       hosts = {
-        for i in range(0, var.postgres.metric) : "vm-postgres-${i + 1}" => {
-          ansible_host            = join("", module.ip-postgres-internet.ip_list[i])
+        for i in range(0, var.postgres.metric) : "postgres-${i + 1}" => {
+          ansible_host            = join("", module.ip-postgres-internal.ip_list[i])
           ansible_user            = module.env.username
           ansible_password        = module.env.password
           instance_role           = "database"
           net                     = "db"
-          domain                  = "${var.name}-postgres-${i + 1}"
+          domain                  = "vm-postgres-${var.name}-${i + 1}"
           postgres_admin_password = ""
+          ansible_ssh_common_args = "-o StrictHostKeyChecking=no"
           subdomain_instance_role = i == 0 ? "master": "standby"
           postgres_hba_entries    = flatten([
             for j in range(1, var.postgres.metric): [
@@ -23,7 +24,6 @@ locals {
             ]
           ])
           network_interfaces      = flatten([
-            module.ip-postgres-internet.interfaces[i],
             module.ip-postgres-internal.interfaces[i],
           ])
         }
@@ -33,11 +33,11 @@ locals {
 }
 
 module "env" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/env?ref=main"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/env?ref=3-fix-issue-teraform-module-using-wrong-name"
 }
 
 module "ip-postgres-internet" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
   metric   = var.postgres.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -53,7 +53,7 @@ module "ip-postgres-internet" {
 }
 
 module "ip-postgres-internal" {
-  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=main"
+  source   = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/ip?ref=3-fix-issue-teraform-module-using-wrong-name"
   metric   = var.postgres.metric
   proxmox  = var.proxmox
   networks  = [{
@@ -68,33 +68,32 @@ module "ip-postgres-internal" {
   }]
 }
 
-module "postgres" {
-  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
-  name               = "${var.name}-postgres"
-  bastion            = var.bastion
-  proxmox            = var.proxmox
-  vmid               = var.vmid
-  partition          = var.postgres.partition
-  total_partition    = var.total_partition
-  node_type          = "vm"
-  playbook           = "postgres"
-  topdir             = path.module
-
-  metric    = var.postgres.metric
-  cpu       = var.postgres.cpu
-  memory    = var.postgres.memory
-  disks     = var.postgres.disks
-  gateway   = var.internet.gateway
-  inventory = local.postgres_inventory
-  flags     = {
-    use_notify_when_done     = true
-    use_elastic_network      = false
-    use_agent                = false
-    use_statefulset_strategy = false
-  }
-  networks  = flatten([
-    module.ip-postgres-internet.networks,
-    module.ip-postgres-internal.networks,
-  ])
-}
-
+//module "postgres" {
+//  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=3-fix-issue-teraform-module-using-wrong-name"
+//  name               = var.name
+//  bastion            = var.bastion
+//  proxmox            = var.proxmox
+//  vmid               = var.vmid
+//  partition          = var.postgres.partition
+//  total_partition    = var.total_partition
+//  node_type          = "postgres"
+//  playbook           = "setup/postgres/cluster"
+//  topdir             = path.module
+//
+//  metric    = var.postgres.metric
+//  cpu       = var.postgres.cpu
+//  memory    = var.postgres.memory
+//  disks     = var.postgres.disks
+//  gateway   = var.internet.gateway
+//  inventory = local.postgres_inventory
+//  flags     = {
+//    use_notify_when_done     = true
+//    use_elastic_network      = false
+//    use_agent                = false
+//    use_statefulset_strategy = false
+//  }
+//  networks  = flatten([
+//    module.ip-postgres-internal.networks,
+//  ])
+//}
+//

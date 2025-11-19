@@ -1,15 +1,15 @@
-# Kafka SSL Configuration
-kafka_ssl_dir: "/opt/kafka/ssl"
-kafka_cluster_certificate:
-  truststore:
-    destination: "kafka.truststore.p12"
-    password: "rootroot"
-    type: "PKCS12"
-  keystore:
-    destination: "kafka.keystore.p12"
-    password: "rootroot"
-    type: "PKCS12"
-  ca_cert:
-    destination: "ca-cert.pem"
-  broker_cert:
-    destination: "broker-cert.pem"
+## Kafka SSL Configuration
+#kafka_ssl_dir: "/opt/kafka/ssl"
+#kafka_cluster_certificate:
+#  truststore:
+#    destination: "kafka.truststore.p12"
+#    password: "rootroot"
+#    type: "PKCS12"
+#  keystore:
+#    destination: "kafka.keystore.p12"
+#    password: "rootroot"
+#    type: "PKCS12"
+#  ca_cert:
+#    destination: "ca-cert.pem"
+#  broker_cert:
+#    destination: "broker-cert.pem"

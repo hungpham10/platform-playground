@@ -74,6 +74,7 @@ resource "local_file" "cloud_init_user_data_file" {
         length(var.installer) > 0 ? format("--tftp_server_ip", var.installer) : "",
 
         # @NOTE: common configuration
+        format("--debug"),
         format("--hostname %s", "${var.format}-${var.node_type}-${var.name}-${count.index}"),
         format("--playbook %s", "${var.playbook}"),
         format("--use_alpaca_agent %s", var.flags.use_agent ? "true" : "false"),
@@ -90,12 +91,11 @@ resource "local_file" "cloud_init_user_data_file" {
     )
 
     # @NOTE: generate playbook.tar.gz as distributed version for dedicated clients
-    access_token       = var.access_token
-    project_id         = var.project_id
-    tag                = var.tag
-    artifact_host      = var.artifact_host
-    artifact_project   = var.artifact_project
-    artifact_namespace = var.artifact_namespace
+    access_token     = var.access_token
+    project_id       = var.project_id
+    tag              = var.tag
+    artifact_host    = var.artifact_host
+    artifact_project = var.artifact_project
 
     # @NOTE: generate infrastructure.yml directly from terraform, this happen when we try
     #        to build installer node

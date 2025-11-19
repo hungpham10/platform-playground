@@ -14,6 +14,7 @@ role_packages:
   bootload:
     yum:
       - aide
+      - bind
       - iptables
       - dhcp-server
       - tftp-server
@@ -21,6 +22,7 @@ role_packages:
       - syslinux-tftpboot
     apt:
       - aide
+      - bind9
       - iptables
       - isc-dhcp-server
       - tftpd-hpa

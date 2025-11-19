@@ -4,3 +4,9 @@
     name: systemd-timesyncd
     state: restarted
     daemon_reload: yes
+
+- name: restart chronny
+  systemd:
+    name: chronyd
+    state: restarted
+    daemon_reload: yes

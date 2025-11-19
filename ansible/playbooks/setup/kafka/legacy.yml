@@ -6,6 +6,7 @@
   become: true
   vars:
     instance_role: eventdriver
+    use_ssl: false
 
   pre_tasks:
     - name: Include role specific variables
@@ -34,6 +35,9 @@
 
   roles:
     - role: kafka/legacy
+      vars:
+        kafka_data_dir: "/kafka/kafka-data"
+        zookeeper_data_dir: "/kafka/zookeeper-snapshot"
       tags: ["kafka"]
 
     # Configure Kafka logging
@@ -73,26 +77,6 @@
       tags: ["monitoring"]
 
   post_tasks:
-    - name: Test PLAINTEXT port 9092
-      ansible.builtin.shell:
-        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --list"
-      become_user: kafka
-      register: test_plaintext
-      changed_when: false
-
-    - name: Test SSL port 9093
-      ansible.builtin.shell:
-        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9093 --list --command-config {{ kafka_config_dir }}/client.properties"
-      become_user: kafka
-      register: test_ssl
-      changed_when: false
-
-    - name: Display test results
-      debug:
-        msg:
-          - "PLAINTEXT (9092): {{ 'OK' if test_plaintext.rc == 0 else 'FAILED' }}"
-          - "SSL (9093): {{ 'OK' if test_ssl.rc == 0 else 'FAILED' }}"
-
     - name: Check if failover-test topic exists
       ansible.builtin.shell:
         cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['hostname'] | default(hostvars[groups['kafka-nodes'][0]]['inventory_hostname']) }}:9092 --list --topic failover-test"
@@ -182,4 +166,4 @@
         - name: Display broker API versions
           debug:
             msg: "Broker API versions test: {{ 'SUCCESS' if broker_api_test.rc == 0 else 'FAILED' }}"
-      when:
+      when: use_ssl

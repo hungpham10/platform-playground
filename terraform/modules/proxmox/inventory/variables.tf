@@ -3,6 +3,12 @@ variable "name" {
   type        = string
 }
 
+variable "format" {
+  description = "The node format which represent the hardware kind"
+  type        = string
+  default     = "vm"
+}
+
 variable "node_type" {
   description = "The node type which will be used to filter out in admin control about which kind of machine"
   type        = string
@@ -11,11 +17,6 @@ variable "node_type" {
 variable "metric" {
   description = "The number of instance for serving this service"
   type        = number
-}
-
-variable "role" {
-  description = "The ansible role"
-  type        = string
 }
 
 variable "net" {

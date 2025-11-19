@@ -13,15 +13,24 @@
   set_fact:
     zookeeper_quorum_voters: []
 
+- name: Initialize zookeeper_connects list
+  set_fact:
+    zookeeper_connects: []
+
 - name: Build zookeeper_quorum_voters list from user defintion
   set_fact:
-    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (item['id'] | string) + '=' + item['hostname'] + ':2888:3888'] }}"
+    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (item['id'] | string) + '=' + item['full_hostname'] + ':2888:3888'] }}"
   loop: "{{ zookeeper_servers }}"
   when: zookeeper_servers is defined
 
 - name: Build zookeeper_quorum_voters list from Ansible group
   set_fact:
-    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (hostvars[item]['kafka_node_id'] | string) + '=' + (hostvars[item]['hostname'] | default(hostvars[item]['inventory_hostname'])) + ':2888:3888'] }}"
+    zookeeper_quorum_voters: "{{ zookeeper_quorum_voters + ['server.' + (hostvars[item]['kafka_node_id'] | string) + '=' + (hostvars[item]['full_hostname'] | default(hostvars[item]['inventory_hostname'])) + ':2888:3888'] }}"
+  loop: "{{ groups['controllers'] }}"
+
+- name: Build zookeeper_connects list from Ansible group
+  set_fact:
+    zookeeper_connects: "{{ zookeeper_connects + [(hostvars[item]['full_hostname'] | default(hostvars[item]['inventory_hostname'])) + ':2181'] }}"
   loop: "{{ groups['controllers'] }}"
 
 - name: Setup zookeeper
@@ -127,7 +136,7 @@
   block:
     - name: Set kafka_advertised_hostname
       set_fact:
-        kafka_advertised_hostname: "{{ hostname | default(inventory_hostname) }}"
+        kafka_advertised_hostname: "{{ full_hostname | default(inventory_hostname) }}"
 
     - name: Check if file exists in local 'files' folder
       stat:

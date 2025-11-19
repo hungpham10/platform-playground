@@ -66,6 +66,7 @@ module "cloudinit" {
   disks        = var.disks
   networks     = var.networks 
   playbook     = var.playbook
+  inventory    = var.inventory
   flags        = {
     use_elastic_network = var.flags.use_elastic_network
     use_notify_when_done = var.flags.use_notify_when_done
@@ -180,7 +181,7 @@ resource "proxmox_vm_qemu" "node" {
 
 resource "null_resource" "wait_for_finishing_installing_instances" {
   depends_on = [proxmox_vm_qemu.node]
-  count      = local.need_waiting ? 1 : 0
+  count      = length(var.bastion) > 0 && local.need_waiting ? 1 : 0
 
   connection {
     type        = "ssh"

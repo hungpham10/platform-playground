@@ -71,28 +71,22 @@ variable "metric" {
   type        = number
 }
 
+variable "artifact_project" {
+  description = "The ansible repository name"
+  type        = string
+  default     = "alpaca-in-house-cluster-v2"
+}
+
 variable "artifact_host" {
   description = "The gitlab host where is storing the ansible repository"
   type        = string
   default     = "gitlab.alpaca.vn"
 }
 
-variable "artifact_namespace" {
-  description = "The gitlab namespace where is storing the ansible repository"
-  type        = string
-  default     = "alpaca-projects%2Fdevops"
-}
-
-variable "artifact_project" {
-  description = "The gitlab project where is storing the ansible repository"
-  type        = string
-  default     = "alpaca-k8s-inhouse-cluster"
-}
-
 variable "project_id" {
   description = "The ansible gitlab project_id repository where is located playbooks to provision nodes"
   type        = string
-  default     = "266"
+  default     = "897"
 }
 
 variable "access_token" {

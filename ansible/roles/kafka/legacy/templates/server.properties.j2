@@ -26,7 +26,7 @@ inter.broker.listener.name=PLAINTEXT
 inter.broker.protocol.version=2.0
 log.message.format.version=2.0
 
-zookeeper.connect={{ groups['controllers'] | join(':2181,') }}:2181
+zookeeper.connect={{ zookeeper_connects | join(',') }}
 zookeeper.connection.timeout.ms=6000
 
 log.dirs={{ kafka_data_dir }}
