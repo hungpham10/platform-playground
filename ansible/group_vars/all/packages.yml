@@ -1,6 +1,6 @@
 ---
 # Base package configuration
-enable_base_package: false
+enable_base_package: true
 base_package_keys:
   apt: []
   yum: []

@@ -1,0 +1,9 @@
+---
+- name: Restart ScyllaDB
+  systemd:
+    name: "scylla-server"
+    state: restarted
+
+- name: Daemon reload
+  systemd:
+    daemon_reload: yes

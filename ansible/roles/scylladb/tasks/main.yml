@@ -1,0 +1,91 @@
+- name: Check if this node is running on Google Cloud Platform (GCE)
+  ansible.builtin.uri:
+    url: http://169.254.169.254/computeMetadata/v1/instance/zone
+    method: GET
+    headers:
+      Metadata-Flavor: Google
+    timeout: 5
+    return_content: yes
+    validate_certs: no
+    status_code: 200
+  register: gce_metadata_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Set scylla_node_id fact for all kafka nodes
+  ansible.builtin.set_fact:
+    scylla_node_id: "{{ groups['scylla-nodes'].index(inventory_hostname) + 1 }}"
+  delegate_to: "{{ inventory_hostname }}"
+  when: inventory_hostname in groups['scylla-nodes']
+
+- name: Set fact is_gce based on metadata availability
+  ansible.builtin.set_fact:
+    is_running_in_gce: "{{ gce_metadata_check.status == 200 and 'projects/' in gce_metadata_check.content }}"
+
+- name: Initialize scylladb_seeds list
+  set_fact:
+    scylladb_seeds: []
+
+- name: Build scylladb_seeds list from Ansible group
+  set_fact:
+    scylladb_seeds: "{{ scylladb_seeds + [ (hostvars[item]['full_hostname'] | default(hostvars[item]['ansible_host'])) ] }}"
+  loop: "{{ groups['scylla-nodes'] | default([]) }}"
+
+- name: Create Scylla directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: scylla
+    group: scylla
+  loop:
+    - "{{ scylla_conf }}"
+    - "{{ scylla_extend }}"
+    - "{{ scylla_commit_log_path }}"
+
+- name: Create Scylla data directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: scylla
+    group: scylla
+  loop: "{{ scylla_data_paths }}"
+
+- name: Check if file io_properties.yaml exists
+  stat:
+    path: "{{ scylla_extend }}/io_properties.yaml"
+  register: file_check_result
+  become: false
+
+- name: Render scylla.yaml
+  template:
+    src: scylla.yaml.j2
+    dest: "{{ scylla_conf }}/scylla.yaml"
+  notify: Restart ScyllaDB
+
+- name: Render sysconfig/scylla-server
+  template:
+    src: scylla-server.j2
+    dest: "/etc/sysconfig/scylla-server"
+  notify: Restart ScyllaDB
+
+- name: Render sysconfig/scylla-jmx
+  template:
+    src: scylla-jmx.j2
+    dest: "/etc/sysconfig/scylla-jmx"
+  notify: Restart ScyllaDB
+
+- name: Render cassandra-rackdc.properties
+  template:
+    src: cassandra-rackdc.properties.j2
+    dest: "{{ scylla_conf }}/cassandra-rackdc.properties"
+  notify: Restart ScyllaDB
+
+- name: Estimate IO to setup scylla disks
+  command: scylla_io_setup
+  when: not file_check_result.stat.exists 
+
+- name: Start and enable ScyllaDB
+  systemd:
+    name: scylla-server
+    state: started
+    enabled: yes

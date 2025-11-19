@@ -3,10 +3,10 @@
 network_mode: "static"  # Options: static, dhcp, gateway
 
 # DHCP configuration
-dhcp_enabled: false
+dhcp_enabled: true
 
 # NTP configuration
-enable_ntp: false
+enable_ntp: true
 ntp_defaults:
   mode: "client"
   upstream_servers:  # Used when not using gateway
@@ -24,10 +24,10 @@ vpn_defaults:
   client_address: ""
 
 # sysctl configuration
-enable_sysctl: false
+enable_sysctl: true
 
 # system-resolver configuration
-enable_resolver: false
+enable_resolver: true
 
 # hardening configuration
 enable_hardening: false
