@@ -10,9 +10,9 @@ locals {
       hosts = {
         for i in range(0, var.metric) : local.instances[i] => merge(
           {
+            ansible_ssh_common_args = "-o StrictHostKeyChecking=no"
             ansible_host            = join("", var.interfaces[i][0].addresses)
             ansible_user            = module.env.username
-            ansible_password        = module.env.password
             instance_role           = var.node_type
             net                     = var.net
             domain                  = format("%s-%s", var.format, local.instances[i])

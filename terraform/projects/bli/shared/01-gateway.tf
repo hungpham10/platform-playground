@@ -33,7 +33,7 @@ module "gateway" {
   total_partition = var.total_partition
   node_type       = "gateway"
   topdir          = path.module
-  playbook        = "gateway"
+  playbook        = "playbooks/setup/gateway.yml"
   metric          = var.gateway.metric
   cpu             = var.gateway.cpu
   memory          = var.gateway.memory

@@ -10,7 +10,8 @@ locals {
           net                     = "db"
           domain                  = "vm-postgres-${var.name}-${i + 1}"
           postgres_admin_password = ""
-          subdo3-fix-issue-teraform-module-using-wrong-name_instance_role = i == 0 ? "master": "standby"
+          ansible_ssh_common_args = "-o StrictHostKeyChecking=no"
+          subdomain_instance_role = i == 0 ? "master": "standby"
           postgres_hba_entries    = flatten([
             for j in range(1, var.postgres.metric): [
               {

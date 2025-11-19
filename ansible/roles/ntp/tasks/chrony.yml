@@ -1,0 +1,14 @@
+- name: Configure chrony.conf
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart chronyd
+
+- name: Enable and start chronyd
+  systemd:
+    name: chronyd
+    enabled: yes
+    state: started

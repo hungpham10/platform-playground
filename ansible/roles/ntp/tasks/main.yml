@@ -8,3 +8,6 @@
   include_tasks: timesyncd.yml
   when: is_debian_based
 
+- name: Configure chrony for Redhat base
+  include_tasks: chrony.yml
+  when: is_redhat_based

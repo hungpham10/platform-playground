@@ -66,6 +66,7 @@ module "cloudinit" {
   disks        = var.disks
   networks     = var.networks 
   playbook     = var.playbook
+  inventory    = var.inventory
   flags        = {
     use_elastic_network = var.flags.use_elastic_network
     use_notify_when_done = var.flags.use_notify_when_done

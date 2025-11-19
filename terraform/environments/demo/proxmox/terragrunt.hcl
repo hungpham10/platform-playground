@@ -38,7 +38,13 @@ locals {
     cpu = 1
     memory = 4096
     metric = 1
-    disks =  []
+    disks =  [
+      {
+        name = "/dev/sda"
+        size = "10G"
+        pool = "VM2"
+      }
+    ]
     ip_beg = {
       internet = 100
       internal = 1

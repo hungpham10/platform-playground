@@ -1,23 +1,57 @@
 ---
-# PostgreSQL repository GPG keys
+role_package_key_ids:
+  scylladb:
+    - keyserver: hkp://keyserver.ubuntu.com:80
+      id: a43e06657bac99e3
+
 role_public_signing_keys:
-  database:
+  # ScyllaDB repository GPG keys
+  scylladb:
+    yum: []
+    apt: []
+
+  # PostgreSQL repository GPG keys
+  postgres:
     yum: []
     apt:
       - url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
         key: postgresql.asc
         state: present
 
-# PostgreSQL official repositories
 role_package_repos:
-  database:
+  # ScyllaDB official repositories
+  scylladb:
+    yum:
+      - name: scylladb-2025.3
+        description: ScyllaDB baseline
+        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-2025.3/$basearch/
+        gpgcheck: yes
+        enabled: yes
+        gpgkey: https://downloads.scylladb.com/downloads/gpg/scylladb-2024-rsa.gpg
+      - name: scylla-2025.3-noarch
+        description: ScyllaDB generic
+        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-2025.3/noarch/
+        gpgcheck: yes
+        enabled: yes
+        gpgkey: https://downloads.scylladb.com/downloads/gpg/scylladb-2024-rsa.gpg
+    apt:
+      - "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/scylladb.gpg] https://downloads.scylladb.com/downloads/scylla/deb/debian-ubuntu/scylladb-2025.3 stable main"
+
+  # PostgreSQL official repositories
+  postgres:
     yum: []
     apt:
       - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
 
-# Required packages for PostgreSQL database servers
 role_packages:
-  database:
+  # Required packages for ScyllaDB database servers
+  scylladb:
+    yum:
+      - scylla
+    apt: []
+
+  # Required packages for PostgreSQL database servers
+  postgres:
     yum: []
     apt:
       # Core PostgreSQL packages

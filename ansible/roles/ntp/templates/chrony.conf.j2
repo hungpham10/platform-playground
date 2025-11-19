@@ -1,0 +1,9 @@
+{% for server in ntp_defaults.upstream_servers %}
+server {{ server }} iburst
+{% endfor %}
+
+keyfile /etc/chrony.keys
+driftfile /var/lib/chrony/drift
+rtcsync
+makestep 1.0 3
+leapsectz right/UTC
