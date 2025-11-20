@@ -5,7 +5,7 @@
     owner: root
     group: root
     mode: '0644'
-  notify: Restart chronyd
+  notify: restart chronyd
 
 - name: Enable and start chronyd
   systemd:

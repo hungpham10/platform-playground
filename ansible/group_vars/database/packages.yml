@@ -22,18 +22,16 @@ role_package_repos:
   # ScyllaDB official repositories
   scylladb:
     yum:
-      - name: scylladb-2025.3
+      - name: scylladb-4.6
         description: ScyllaDB baseline
-        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-2025.3/$basearch/
-        gpgcheck: yes
+        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-4.6/$basearch/
+        gpgcheck: no
         enabled: yes
-        gpgkey: https://downloads.scylladb.com/downloads/gpg/scylladb-2024-rsa.gpg
-      - name: scylla-2025.3-noarch
+      - name: scylla-4.6-noarch
         description: ScyllaDB generic
-        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-2025.3/noarch/
-        gpgcheck: yes
+        baseurl: https://downloads.scylladb.com/downloads/scylla/rpm/centos/scylladb-4.6/noarch/
+        gpgcheck: no
         enabled: yes
-        gpgkey: https://downloads.scylladb.com/downloads/gpg/scylladb-2024-rsa.gpg
     apt:
       - "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/scylladb.gpg] https://downloads.scylladb.com/downloads/scylla/deb/debian-ubuntu/scylladb-2025.3 stable main"
 

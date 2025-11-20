@@ -1,0 +1,24 @@
+scylla_conf: "/etc/scylla"
+scylla_home: "/var/lib/scylla"
+scylla_extend: "/etc/scylla.d"
+scylla_commit_log_path: "/var/lib/scylla/commits"
+scylla_data_paths:
+  - "/var/lib/scylla/data"
+
+murmur3_partitioner_ignore_msb_bits: 12
+number_of_tokens: 256
+number_of_sharding: 2
+
+commit_log_sync_period_in_ms: 1000
+commit_log_segment_size_in_mb: 64
+commit_log_total_space_in_mb: -1
+
+read_request_timeout_in_ms: 5000
+write_request_timeout_in_ms: 2000
+cas_contention_timeout_in_ms: 1000
+
+batch_size_warn_threshold_in_kb: 5
+batch_size_fail_threshold_in_kb: 50
+
+internode_compression: "all"
+auto_snapshot: false

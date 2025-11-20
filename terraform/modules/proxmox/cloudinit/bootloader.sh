@@ -9,17 +9,12 @@
 ######################################################################
 
 function error() {
-	if [ $# -eq 2 ]; then
-		echo "[  ERROR  ]: $1 line ${SCRIPT}:$2"
-	else
-		echo "[  ERROR  ]: $1 in ${SCRIPT}"
-	fi
-
+  echo "[  ERROR  ]: $1 in ${SCRIPT}"
   curl -X POST                                                                                                                      \
        -H "Content-Type: application/json"                                                                                          \
        -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"[${hostname}]: $1 in ${SCRIPT}\", \"disable_notification\": false}"     \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
-	exit 1
+  exit 1
 }
 
 function error_with_log() {
@@ -28,7 +23,7 @@ function error_with_log() {
        -d "{\"chat_id\": \"${telegram_chat_id}\", \"text\": \"${hostname}: ${1}\nReason:\\n\", \"disable_notification\": false}"      \
         https://api.telegram.org/bot${telegram_bot_token}/sendMessage
   curl -v -F "chat_id=${telegram_chat_id}" -F document=@$2 https://api.telegram.org/bot${telegram_bot_token}/sendDocument
-	exit 1
+  exit 1
 }
 
 function cleanup() {
@@ -173,9 +168,18 @@ function init() {
   fi
 
   # Setup ansible
-  if ! apt install -y python3-pip git; then
-    error "fail install python3-pip"
+  if which apt &> /dev/null; then
+    if ! apt install -y python3-pip; then
+      error "fail install python3-pip"
+    fi
+  elif which yum &> /dev/null; then
+    if ! yum install -y python3-pip; then
+      error "fail install python3-pip"
+    fi
+  else
+    error "not support this distro"
   fi
+
   if ! pip3 install ansible; then
     error "fail install ansible"
   fi
@@ -223,7 +227,7 @@ notify_when_done=1
 branch="master"
 
 while [ $# -gt 0 ]; do
-	case $1 in
+  case $1 in
     --debug)                           set -x;;
     --ip)                              ip="$2"; shift;;
     --size)                            size="$2"; shift;;
@@ -237,11 +241,11 @@ while [ $# -gt 0 ]; do
     --telegram_chat_id)                telegram_chat_id="$2"; shift;;
     --telegram_bot_token)              telegram_bot_token="$2"; shift;;
     --infrastructure_yaml)             infrastructure_config_yaml_path="$2"; shift;;
-		(--) 		shift; break;;
-		(*) 		error "unrecognized option $1";;
-		(*)		  error "unsupport command $1";;
-	esac
-	shift
+    (--) 		shift; break;;
+    (*) 		error "unrecognized option $1";;
+    (*)		    error "unsupport command $1";;
+  esac
+  shift
 done
 
 trap cleanup EXIT
