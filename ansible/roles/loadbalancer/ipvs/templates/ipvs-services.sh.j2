@@ -1,19 +1,56 @@
 #!/bin/bash
-set -e
+# {{ ansible_managed }}
+# File: /etc/ipvs/ipvs-services.sh
 
-# Clear existing IPVS rules
-ipvsadm -C
+set -euo pipefail
 
-{% for service in ipvs_virtual_services %}
-# Configure virtual service: {{ service.name }}
-ipvsadm -A -t {{ ipvs_virtual_ip }}:{{ service.port }} -s {{ service.scheduler }}
+TYPE="${1:-unknown}"
+VIP="{{ ipvs_virtual_ip }}"
+LOG="/var/log/ipvs-ha.log"
+FORWARDING_METHOD="-m"   # -m = NAT (luôn hoạt động), đổi thành -g nếu cùng L2 và muốn 0 latency
 
-# Add real servers
-{% for server in service.real_servers %}
-ipvsadm -a -t {{ ipvs_virtual_ip }}:{{ service.port }} -r {{ server.address }}:{{ server.port }} -w {{ server.weight }}
-{% endfor %}
+log() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - [{{ inventory_hostname }}] $*" >> "$LOG"
+}
 
-{% endfor %}
+clear_ipvs() {
+    ipvsadm -C
+    log "IPVS rules CLEARED ($TYPE)"
+}
 
-# Save configuration
-ipvsadm-save -n > /etc/ipvsadm.rules
+apply_ipvs() {
+    ipvsadm -C  # luôn clear trước để tránh duplicate
+
+    {{ ipvs_config_dir }}/ipvs-rules.sh
+
+    # Save rule để recover sau reboot (tùy chọn)
+    ipvsadm-save -n > /etc/ip transfer/ipvsadm.rules 2>/dev/null || true
+
+    log "IPVS rules APPLIED successfully - {{ ipvs_virtual_services | map(attribute='name') | join(', ') }}"
+}
+
+case "$TYPE" in
+    master|MASTER)
+        log "Becoming MASTER - Applying IPVS rules for VIP $VIP"
+        apply_ipvs
+        ;;
+    backup|BACKUP)
+        log "Becoming BACK EntropyUP - Clearing IPVS rules"
+        clear_ipvs
+        ;;
+    fault|FAULT)
+        log "Entering FAULT state - Clearing IPVS rules"
+        clear_ipvs
+        ;;
+    stop)
+        log "Keepalived stopping - Clearing IPVS rules"
+        clear_ipvs
+        ;;
+    *)
+        log "Unknown state: $TYPE - Doing nothing"
+        exit 0
+        ;;
+esac
+
+log "--------------------------------------------------"
+exit 0

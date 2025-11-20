@@ -1,0 +1,37 @@
+---
+- import_playbook: ../../boilerplate.yml
+
+- name: Configure Kubernetes Worker Instance
+  hosts: k8s-worker-*
+  become: true
+  vars:
+    instance_role: kubernetes
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../../group_vars/all"
+        - "../../../group_vars/kubernetes"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    - role: kubernetes/worker
+      tags: ["kubernetes"]

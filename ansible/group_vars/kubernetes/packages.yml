@@ -1,0 +1,25 @@
+container_manager: "containerd.io"
+
+role_package_keys:
+  master:
+    yum: []
+    apt: []
+  worker:
+    yum: []
+    apt: []
+
+role_packages:
+  master:
+    yum:
+      - ipvsadm
+      - rsync
+    apt:
+      - ipvsadm
+      - rsync
+  worker:
+    yum:
+      - ipvsadm
+      - rsync
+    apt:
+      - ipvsadm
+      - rsync

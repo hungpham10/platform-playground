@@ -1,0 +1,31 @@
+firewall_default_rules:
+  master:
+    tcp_ports:
+      - port: 6443
+        comment: "Kubernetes API Server"
+      - port: 9443
+        comment: "k0s controller join API"
+      - port: 2379
+        comment: "etcd communication"
+      - port: 2380
+        comment: "etcd communication"
+      - port: 10250
+        comment: "Kubelet API"
+      - port: 8132
+        comment: "Konnectivity Server from workers"
+      - port: 112
+        comment: "Keepalived VRRP"
+    udp_ports:
+      - port: 112
+        comment: "Keepalived VRRP"
+  worker:
+    tcp_ports:
+      - port: 10250
+        comment: "Kubelet API"
+      - port: 179
+        comment: "BGP communication"
+    udp_ports:
+      - port: 4789
+        comment: "Calico VXLAN communication"
+      - port: 8472
+        comment: "Flannel VXLAN communication"

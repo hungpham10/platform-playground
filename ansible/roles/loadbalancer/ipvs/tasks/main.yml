@@ -36,7 +36,6 @@
     src: ipvs-services.sh.j2
     dest: "{{ ipvs_config_dir }}/ipvs-services.sh"
     mode: '0755'
-  notify: reload ipvs services
 
 - name: Get IPVS service ports
   command: ipvsadm -Ln
@@ -46,9 +45,16 @@
   set_fact:
     ipvs_ports: "{{ ipvs_output.stdout_lines | select('search', 'TCP') | map('regex_search', ':[0-9]+') | map('regex_replace', ':', '') | list }}"
 
+- name: Render ipvs-rules.sh
+  template:
+    src: ipvs-rules.sh.j2
+    dest: "{{ ipvs_config_dir }}/ipvs-rules.sh"
+    mode: '0755'
+  notify: restart keepalived   
+
 - name: Update IPVS services like scale in/out
   template:
-    src: update-ipvs.sh.j2
+    src: ipvs-scaling.sh.j2
     dest: "{{ ipvs_config_dir }}/ipvs-scaling.sh"
     mode: '0755'
 
@@ -86,3 +92,15 @@
     state: stopped
     enabled: yes
 
+- name: Check if script health.sh exists 
+  stat:
+    path: "{{ ipvs_config_dir }}/health.sh"
+  register: file_check_result
+
+- name: Render default healthcheck script
+  template:
+    src: health.sh.j2
+    dest: "{{ ipvs_config_dir }}/health.sh"
+    mode: '0755'
+  notify: restart keepalived   
+  when: not file_check_result.stat.exists

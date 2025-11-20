@@ -1,0 +1,10 @@
+
+{% for service in ipvs_virtual_services %}
+ipvsadm -A -t {{ VIP }}:{{ service.port }} -s {{ service.scheduler }}
+
+{% for server in service.real_servers %}
+ipvsadm -a -t {{ VIP }}:{{ service.port }} \
+    -r {{ server.address }}:{{ server.port }} \
+    {{ FORWARDING_METHOD }} -w {{ server.weight }}
+{% endfor %}
+{% endfor %}

@@ -1,19 +1,47 @@
+# {{ ansible_managed }}
+
 global_defs {
-   router_id {{ ansible_hostname }}
+    enable_script_security
+    script_user root
+    router_id {{ ansible_hostname }}
+
+    notification_email {
+        # sysadmin@example.com   # bỏ comment + thêm email nếu muốn nhận alert
+    }
+    # notification_email_from keepalived@{{ inventory_hostname }}
+    # smtp_server localhost
+    # smtp_connect_timeout 30
+}
+
+vrrp_script check_health {
+    script "{{ ipvs_config_dir }}/health.sh"
+    interval 5      # check mỗi 5s
+    timeout 2       # nếu script không trả về trong 2s → coi như fail
+    weight -50      # nếu fail → giảm 50 priority (đảm bảo mất VIP ngay)
+    fall 2          # fail 2 lần liên tiếp mới giảm priority
+    rise 2          # ok 2 lần mới tăng lại
 }
 
 vrrp_instance {{ ipvs_vrrp_instance }} {
-    state {{ ipvs_vrrp_state }}
+    state {{ ipvs_vrrp_state | upper }}
     interface {{ ipvs_vrrp_interface }}
     virtual_router_id {{ ipvs_vrrp_virtual_router_id }}
     priority {{ ipvs_vrrp_priority }}
+
     authentication {
         auth_type PASS
         auth_pass {{ ipvs_vrrp_password }}
     }
+
     virtual_ipaddress {
-        {% for service in ipvs_virtual_services %}
-        {{ service.vip }}
-        {% endfor %}
+        {{ ipvs_virtual_ip }}/24 dev {{ ipvs_vrrp_interface }} label {{ ipvs_vrrp_interface }}:vip
+    }
+
+    notify_master "{{ ipvs_config_dir }}/ipvs-services.sh master"
+    notify_backup "{{ ipvs_config_dir }}/ipvs-services.sh backup"
+    notify_fault  "{{ ipvs_config_dir }}/ipvs-services.sh fault"
+
+    track_script {
+        check_health
     }
 }

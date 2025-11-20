@@ -1,0 +1,187 @@
+---
+- name: Setup masters
+  block:
+    - name: Disable runtime swap
+      systemd:
+        name: swap.target
+        masked: yes
+        state: stopped
+    
+    - name: Stop swap in fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^\s*[^#].*swap'
+        state: absent
+    
+    - name: Check if controller-token exists 
+      stat:
+        path: "{{ k0s_home }}/controller-token"
+      register: file_check_result
+    
+    - name: Detect architecture and set k0s_arch
+      set_fact:
+        k0s_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+    
+    - name: Download k0s binary
+      get_url:
+        url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_version }}/k0s-{{ k0s_version }}-{{ k0s_arch }}"
+        dest: /usr/bin/k0s
+        mode: '0755'
+        owner: root
+        group: root
+    
+    - name: Create k0s folders
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ k0s_home }}"
+    
+    - name: Render k0s config
+      template:
+        src: k0s.yaml.j2
+        dest: "{{ k0s_home }}/k0s.yaml"
+        mode: '0644'
+      when: inventory_hostname == groups['masters'] | first
+      notify: restart k0scontroller
+    
+    - name: Create k0s initial controller service with install command
+      command: k0s install controller  
+      args:
+        creates: /etc/systemd/system/k0scontroller.service
+      when: inventory_hostname == groups['masters'] | first
+    
+    - name: Enable and start k0scontroller
+      systemd:
+        name: k0scontroller
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      when: inventory_hostname == groups['masters'] | first
+    
+    - name: Wait for Kubernetes API server really ready
+      ansible.builtin.command: k0s kubectl get --raw=/readyz
+      register: k0s_readyz
+      until: k0s_readyz.stdout is defined and k0s_readyz.stdout.strip() == "ok"
+      retries: 90          
+      delay: 10
+      changed_when: false  
+      when: inventory_hostname == groups['masters'] | first
+    
+    - name: Render tokens
+      block:
+        - name: Fetch join token for worker
+          command: k0s token create --role=worker --expiry 876000h
+          register: new_worker_token
+          changed_when: false
+          when: inventory_hostname == groups['masters'] | first
+        
+        - name: Fetch controller token
+          command: k0s token create --role controller --expiry 876000h
+          register: new_controller_token
+          changed_when: true
+          when: inventory_hostname == groups['masters'] | first
+        
+        - name: Render join token var file for workers
+          copy:
+            content: "{{ new_worker_token.stdout }}"
+            dest: /etc/k0s/worker-token
+            mode: '0600'
+          when: inventory_hostname == groups['masters'] | first
+        
+        - name: Render join token var file for masters
+          copy:
+            content: "{{ new_controller_token.stdout }}"
+            dest: /etc/k0s/controller-token
+            mode: '0600'
+          when: inventory_hostname == groups['masters'] | first
+      when: not file_check_result.stat.exists
+    
+    - name: Read controller token from first master to secondary masters
+      slurp:
+        src: "{{ k0s_home }}/controller-token"
+      register: controller_token
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+      delegate_to: "{{ groups['masters'][0] }}"
+    
+    - name: Read worker tokens from first master to secondary masters
+      slurp:
+        src: "{{ k0s_home }}/worker-token"
+      register: worker_token
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+      delegate_to: "{{ groups['masters'][0] }}"
+    
+    - name: Write controller token to secondary masters
+      copy:
+        content: "{{ controller_token.content | b64decode | default('') }}"
+        dest: /etc/k0s/controller-token
+        mode: '0600'
+        owner: root
+        group: root
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+    
+    - name: Write worker token to secondary masters
+      copy:
+        content: "{{ worker_token.content | b64decode | default('') }}"
+        dest: /etc/k0s/worker-token
+        mode: '0600'
+        owner: root
+        group: root
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+    
+    - name: Join new controller
+      command: "k0s install controller --token-file {{ k0s_home }}/controller-token --enable-worker=false"
+      args:
+        creates: /etc/systemd/system/k0scontroller.service
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+      notify: restart k0scontroller
+    
+    - name: Enable and start k0scontroller
+      systemd:
+        name: k0scontroller
+        enabled: yes
+        state: started
+        daemon_reload: yes
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+    
+    - name: Wait for Kubernetes API server really ready
+      ansible.builtin.command: k0s kubectl get --raw=/readyz
+      register: k0s_readyz
+      until: k0s_readyz.stdout is defined and k0s_readyz.stdout.strip() == "ok"
+      retries: 90          
+      delay: 10
+      changed_when: false  
+      when: 
+        - inventory_hostname != groups['masters'] | first
+        - inventory_hostname in groups['masters']
+
+    - name: "CHECK → k0scontroller service status (secondary masters)"
+      systemd:
+        name: k0scontroller
+      register: k0s_service_status
+      when: inventory_hostname != groups['masters'] | first
+
+    - name: "FAIL if k0scontroller not running (secondary masters)"
+      fail:
+        msg: |
+          k0scontroller service failed on {{ inventory_hostname }}!
+          ActiveState: {{ k0s_service_status.status.ActiveState }}
+          SubState: {{ k0s_service_status.status.SubState }}
+          Log: {{ (k0s_service_status.status | json_query('ExecMainStartTimestamp') or 'N/A') }}
+      when:
+        - inventory_hostname != groups['masters'] | first
+        - k0s_service_status.status.ActiveState != "active"
+  when: inventory_hostname in groups['masters']
