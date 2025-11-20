@@ -12,7 +12,7 @@
   ignore_errors: yes
   changed_when: false
 
-- name: Set scylla_node_id fact for all kafka nodes
+- name: Set scylla_node_id fact for all scylla nodes
   ansible.builtin.set_fact:
     scylla_node_id: "{{ groups['scylla-nodes'].index(inventory_hostname) + 1 }}"
   delegate_to: "{{ inventory_hostname }}"
@@ -83,6 +83,10 @@
 - name: Estimate IO to setup scylla disks
   command: scylla_io_setup
   when: not file_check_result.stat.exists 
+  register: io_setup_result
+  failed_when: io_setup_result.rc != 0
+  changed_when: io_setup_result.rc == 0
+  timeout: 600
 
 - name: Start and enable ScyllaDB
   systemd:

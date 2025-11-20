@@ -6,21 +6,11 @@ base_package_keys:
   yum: []
 
 base_package_repos:
-  yum:
-    - name: grafana
-      baseurl: https://rpm.grafana.com
-      description: Grafana mono repository for Grafana ecosystem
-      gpgcheck: yes
-      gpgkey: https://rpm.grafana.com/gpg.key
-      enabled: yes
-  apt:
-    - "deb [signed-by=/usr/share/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+  yum: []
+  apt: []
 
 base_public_singing_keys:
-  apt:
-    - url: https://apt.grafana.com/gpg.key
-      key: grafana.gpg
-      state: present
+  apt: []
   yum: []
 
 base_packages:
@@ -34,7 +24,6 @@ base_packages:
     - e2fsprogs
     - parted
     - btrfs-progs
-    - alloy
   yum:
     - acl
     - firewalld          # Tương đương ufw
@@ -44,5 +33,4 @@ base_packages:
     - xfsprogs
     - e2fsprogs
     - parted
-    - alloy
     - chrony

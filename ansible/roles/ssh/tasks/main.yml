@@ -12,7 +12,6 @@
     ssh-keygen -t {{ ssh_key_type }} -b {{ ssh_key_size }} -f /home/{{ ssh_user }}/.ssh/{{ ssh_key_name }} -N "" -q
   args:
     creates: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}"
-  become: yes
   become_user: "{{ ssh_user }}"
   register: keygen_result
 
@@ -40,7 +39,6 @@
   slurp:
     src: "/home/{{ ssh_user }}/.ssh/authorized_keys"
   register: auth_keys
-  become: yes
   become_user: "{{ ssh_user }}"
 
 - name: Parse authorized_keys content
