@@ -1,0 +1,152 @@
+---
+- import_playbook: ../../boilerplate.yml
+
+- name: Configure Kubernetes Master Instance
+  hosts: k8s-master-*
+  become: true
+  vars:
+    instance_role: kubernetes
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../../group_vars/all"
+        - "../../../group_vars/kubernetes"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    - role: loadbalancer/ipvs
+      vars:
+        ipvs_virtual_ip: "{{ k8s_master_public }}"
+        ipvs_virtual_services:
+          - name: kube-apiserver
+            port: 6443
+            protocol: tcp
+            scheduler: wrr
+            real_servers: >-
+              {%- set rs = [] -%}
+              {%- for ip in groups['k8s-master-*'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | unique | list -%}
+              {{ rs.append({'address': ip, 'port': 6443, 'weight': 100}) }}
+              {%- endfor -%}
+              {{ rs }}
+        ipvs_vrrp_interface: "{{ network_interfaces[0].name | default('eth0') }}"
+      when: k8s_master_public is defined
+      tags: ["loadbalance"]
+
+    - role: kubernetes/master
+      vars:
+        k0s_controller_config:
+          apiVersion: k0s.k0sproject.io/v1beta1
+          kind: ClusterConfig
+          metadata:
+            name: k0s
+          spec:
+            api:
+              port: 6443
+              externalAddress: "{{ k8s_master_public | default(ansible_facts['default_ipv4']['address']) }}"
+              sans:
+                - "{{ k8s_master_public | default(ansible_facts['default_ipv4']['address']) }}"
+                - "{{ ansible_facts['default_ipv4']['address'] }}"
+                - "kubernetes.default.svc.{{ cluster_domain | default('cluster.local') }}"
+                - "kubernetes.default.svc"
+                - "kubernetes.default"
+                - "kubernetes"
+                - "localhost"
+                - "127.0.0.1"
+            network:
+              provider: calico
+              podCIDR: "{{ k8s_pod_cidr }}"
+              serviceCIDR: "{{ k8s_service_cidr }}"
+              calico:
+                mode: "VXLANCrossSubnet"
+                mtu: "{{ vxlan_mtu | default(1440) }}"
+                overlay: "CrossSubnet"
+                vxlanPort: "{{ vxlan_port | default(4789) }}"
+                vxlanVNI: "{{ vxlan_vni }}"
+    
+            telemetry:
+              enabled: false
+    
+            storage:
+              type: etcd
+              etcd:
+                peerAddress: "{{ ansible_facts['default_ipv4']['address'] }}"
+      when: vxlan_vni is defined
+      tags: [kubernetes]
+
+    - role: kubernetes/master
+      vars:
+        k0s_controller_config:
+          apiVersion: k0s.k0sproject.io/v1beta1
+          kind: ClusterConfig
+          metadata:
+            name: k0s
+          spec:
+            api:
+              port: 6443
+              externalAddress: "{{ ansible_facts['default_ipv4']['address'] }}"
+            installConfig:
+              users:
+                etcdUser: etcd
+                kineUser: kube-apiserver
+                konnectivityUser: konnectivity-server
+                kubeAPIserverUser: kube-apiserver
+                kubeSchedulerUser: kube-scheduler
+            network:
+              podCIDR: "{{ k8s_pod_cidr }}"
+              serviceCIDR: "{{ k8s_service_cidr }}"
+              provider: kuberouter
+              kubeProxy:
+                iptables:
+                  minSyncPeriod: 0s
+                  syncPeriod: 0s
+                ipvs:
+                  minSyncPeriod: 0s
+                  syncPeriod: 0s
+                  tcpFinTimeout: 0s
+                  tcpTimeout: 0s
+                  udpTimeout: 0s
+                metricsBindAddress: 0.0.0.0:10249
+                mode: iptables
+                nftables:
+                  minSyncPeriod: 0s
+                  syncPeriod: 0s
+              kuberouter:
+                autoMTU: true
+                hairpin: Enabled
+                metricsPort: 8080
+              nodeLocalLoadBalancing:
+                enabled: false
+                envoyProxy:
+                  apiServerBindPort: 7443
+                  konnectivityServerBindPort: 7132
+                type: EnvoyProxy
+            storage:
+              type: etcd
+              etcd:
+                peerAddress: "{{ ansible_facts['default_ipv4']['address'] }}"
+                extraArgs:
+                  listen-client-urls: "https://0.0.0.0:2379"
+                  advertise-client-urls: "https://{{ ansible_facts['default_ipv4']['address'] }}:2379"
+            telemetry:
+              enabled: true
+      when: vxlan_vni is undefined
+      tags: [kubernetes]

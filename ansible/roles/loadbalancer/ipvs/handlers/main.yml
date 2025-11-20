@@ -7,6 +7,3 @@
   systemd:
     name: keepalived
     state: restarted
-
-- name: reload ipvs services
-  command: "{{ ipvs_config_dir }}/ipvs-services.sh"

@@ -1,0 +1,55 @@
+---
+- import_playbook: ../boilerplate.yml
+
+- name: Configure Installer Instance
+  hosts: installer-*
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../group_vars/all"
+        - "../../group_vars/gateway"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    # @NOTE: setup bind
+    - role: bind
+      vars:
+        internal_zones: "{{ bind_configs.zones | default([]) }}"
+        internal_subnets: "{{ bind_configs.subnets | default([]) }}"
+        internet_dns_resolvers: "{{ bind_configs.nameservers | default([]) }}"
+      tags: ["network", "dns"]
+
+    # @NOTE: setup bind exporter
+    - role: exporters/bind
+      tags: ["network", "dns"]
+
+    # @NOTE: setup matchbox
+    - role: matchbox
+      tags: ["network", "matchbox"]
+
+    # @NOTE: setup tftp
+    - role: tftp
+      vars:
+        tftp_root: "{{ tftp_root_dir | default('/srv/tftp') }}"
+        boot_menu_items: "{{ pxe_menu_items | default([]) }}"
+      tags: ["network", "tftp"]
+

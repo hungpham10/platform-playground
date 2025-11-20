@@ -1,0 +1,11 @@
+
+#!/bin/bash
+# {{ ansible_managed }}
+# File: /etc/ipvs/health.sh
+# Return 0 = healthy → giữ VIP
+# Return 1 = unhealthy → mất VIP ngay
+
+set -uo pipefail
+
+echo "OK: Node is healthy"
+exit 0

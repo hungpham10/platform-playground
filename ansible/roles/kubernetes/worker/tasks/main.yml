@@ -1,0 +1,70 @@
+- name: Setup workers
+  block:
+    - name: Disable runtime swap
+      systemd:
+        name: swap.target
+        masked: yes
+        state: stopped
+    
+    - name: Stop swap in fstab
+      lineinfile:
+        path: /etc/fstab
+        regexp: '^\s*[^#].*swap'
+        state: absent
+
+    - name: Check if worker-token exists 
+      stat:
+        path: "{{ k0s_home }}/worker-token"
+      register: file_check_result
+    
+    - name: Detect architecture and set k0s_arch
+      set_fact:
+        k0s_arch: "{{ 'arm64' if ansible_architecture == 'aarch64' else 'amd64' }}"
+
+    - name: Download k0s binary
+      get_url:
+        url: "https://github.com/k0sproject/k0s/releases/download/{{ k0s_version }}/k0s-{{ k0s_version }}-{{ k0s_arch }}"
+        dest: /usr/bin/k0s
+        mode: '0755'
+        owner: root
+        group: root
+    
+    - name: Create k0s folders
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "{{ k0s_home }}"
+
+    - name: Verify system
+      command: k0s sysinfo
+
+    - name: Read worker tokens from first master to secondary masters
+      slurp:
+        src: "{{ k0s_home }}/worker-token"
+      register: worker_token
+      delegate_to: "{{ groups['masters'][0] }}"
+    
+    - name: Write worker token to secondary masters
+      copy:
+        content: "{{ worker_token.content | b64decode | default('') }}"
+        dest: /etc/k0s/worker-token
+        mode: '0600'
+        owner: root
+        group: root
+    
+    - name: Create k0s worker service with install command
+      register: install_worker_cmd
+      command: k0s install worker --token-file {{ k0s_home }}/worker-token
+      args:
+        creates: /etc/systemd/system/k0sworker.service
+      changed_when: install_worker_cmd | length > 0
+    
+    - name: Enable and check k0s service
+      systemd:
+        name: k0sworker
+        daemon_reload: yes
+        state: started
+        enabled: yes
+  when: inventory_hostname in groups['workers']

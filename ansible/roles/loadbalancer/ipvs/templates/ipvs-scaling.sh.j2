@@ -43,7 +43,7 @@ IPVSADM_PATH="/sbin/ipvsadm" # Path to ipvsadm, adjust if needed
 IPVS_VIRTUAL_IP="{{ ipvs_virtual_ip }}" # Replace with your IPVS virtual IP
 IPVS_PORTS="{{ ipvs_ports | join(',') }}" # List of ports, comma-separated
 IPVS_REAL_SERVER_WEIGHT="1" # Weight for the new real server
-IPVS_SERVICES_SH="{{ ipvs_config_dir }}/ipvs-services.sh" # Path to ipvs-services.sh
+IPVS_SERVICES_SH="{{ ipvs_config_dir }}/ipvs-rules.sh" # Path to ipvs-services.sh
 HEALTHCHECKS_DIR="{{ ipvs_config_dir }}/healthchecks" # Healthchecks directory
 
 # Get the new server's IP address from the specified interface

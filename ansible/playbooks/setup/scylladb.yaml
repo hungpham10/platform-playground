@@ -1,0 +1,70 @@
+---
+- import_playbook: ../boilerplate.yml
+
+- name: Configure ScyllaDB Database Servers
+  hosts: scylladb-*
+  become: true
+  vars:
+    instance_role: database
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../group_vars/all"
+        - "../../group_vars/database"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - debug:
+        msg: "../../host_vars/{{ inventory_hostname }}"
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+  roles:
+    - name: scylladb
+      vars:
+        cluster_name: "test"
+      tags: ["database", "scylladb"]
+
+  post_tasks:
+    - name: Test status of cluster
+      ansible.builtin.shell: |
+        nodetool -h ::FFFF:127.0.0.1 status | grep -E '^(UN|DN|UJ|DJ)' || true
+      changed_when: false
+      register: nodetool_status
+
+
+    - name: Count node UN (Up/Normal)
+      set_fact:
+        un_count: "{{ nodetool_status.stdout_lines | select('search', '^UN') | list | length }}"
+
+    - name: Count number of scylla nodes
+      set_fact:
+        all_scylla_node_count: "{{ groups['scylla-nodes'] | map('extract', hostvars) | selectattr('inventory_hostname') | list | length }}"
+
+    - name: Check if every node is up and ready
+      fail:
+        msg: >-
+          Only have {{ un_count }}/{{ all_scylla_node_count }} node in UN.
+      when: un_count != all_scylla_node_count
+
+    - name: Scan error
+      ansible.builtin.shell: |
+        journalctl -u scylla-server --since "10 minutes ago" | grep -iE "(ERROR|exception|panic|segmentation|reactor stalled)" | tail -20 || true
+      changed_when: false
+      register: scylla_errors
+      failed_when: "'ERROR' in scylla_errors.stdout.upper() or 'EXCEPTION' in scylla_errors.stdout.upper()"
