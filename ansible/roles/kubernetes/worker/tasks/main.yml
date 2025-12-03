@@ -44,11 +44,12 @@
       slurp:
         src: "{{ k0s_home }}/worker-token"
       register: worker_token
-      delegate_to: "{{ groups['masters'][0] }}"
+      delegate_to: "{{ k8s_master_ip | default(groups['masters'][0]) }}"
+      when: worker_token is undefined
     
     - name: Write worker token to secondary masters
       copy:
-        content: "{{ worker_token.content | b64decode | default('') }}"
+        content: "{{ worker_token | default(worker_token.content | b64decode | default('')) }}"
         dest: /etc/k0s/worker-token
         mode: '0600'
         owner: root

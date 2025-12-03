@@ -1,19 +1,17 @@
 
 role_public_signing_keys:
-  database:
+  cache:
     yum: []
     apt: []
 
-# PostgreSQL official repositories
 role_package_repos:
-  database:
+  cache:
     yum: []
     apt: []
 
-# Required packages for PostgreSQL database servers
 role_packages:
-  database:
+  cache:
     yum:
-      - redis-server
+      - redis
     apt:
-      - redis-server
+      - redis

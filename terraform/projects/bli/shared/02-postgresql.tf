@@ -68,32 +68,32 @@ module "ip-postgres-internal" {
   }]
 }
 
-//module "postgres" {
-//  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
-//  name               = var.name
-//  bastion            = var.bastion
-//  proxmox            = var.proxmox
-//  vmid               = var.vmid
-//  partition          = var.postgres.partition
-//  total_partition    = var.total_partition
-//  node_type          = "postgres"
-//  playbook           = "setup/postgres/cluster"
-//  topdir             = path.module
-//
-//  metric    = var.postgres.metric
-//  cpu       = var.postgres.cpu
-//  memory    = var.postgres.memory
-//  disks     = var.postgres.disks
-//  gateway   = var.internet.gateway
-//  inventory = local.postgres_inventory
-//  flags     = {
-//    use_notify_when_done     = true
-//    use_elastic_network      = false
-//    use_agent                = false
-//    use_statefulset_strategy = false
-//  }
-//  networks  = flatten([
-//    module.ip-postgres-internal.networks,
-//  ])
-//}
-//
+module "postgres" {
+  source             = "git::ssh://git@github.com/hungpham10/platform-playground.git//terraform/modules/proxmox/node?ref=main"
+  name               = var.name
+  bastion            = var.bastion
+  proxmox            = var.proxmox
+  vmid               = var.vmid
+  partition          = var.postgres.partition
+  total_partition    = var.total_partition
+  node_type          = "postgres"
+  playbook           = "setup/postgres/cluster"
+  topdir             = path.module
+
+  metric    = var.postgres.metric
+  cpu       = var.postgres.cpu
+  memory    = var.postgres.memory
+  disks     = var.postgres.disks
+  gateway   = var.internet.gateway
+  inventory = local.postgres_inventory
+  flags     = {
+    use_notify_when_done     = true
+    use_elastic_network      = false
+    use_agent                = false
+    use_statefulset_strategy = false
+  }
+  networks  = flatten([
+    module.ip-postgres-internal.networks,
+  ])
+}
+

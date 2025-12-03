@@ -1,0 +1,25 @@
+- name: Create Redis directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+  loop:
+    - "{{ redis_conf_dir }}"
+    - "{{ redis_data_dir }}"
+
+- name: Render redis.conf
+  template:
+    src: redis.conf.j2
+    dest: "{{ redis_conf_dir }}/redis.conf"
+    owner: "{{ redis_user }}"
+    group: "{{ redis_group }}"
+    mode: "0644"
+  notify: restart redis
+
+- name: Start and enable Redis
+  systemd:
+    name: redis
+    state: started
+    enabled: yes
+    daemon_reload: yes

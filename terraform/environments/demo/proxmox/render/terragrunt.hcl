@@ -30,12 +30,7 @@ module "common" {
   bastion         = "" 
   name            = ${jsonencode(local.configs.locals.workspace)}
   vmid            = ${jsonencode(local.configs.locals.vmid)}
-  total_partition = ${jsonencode(local.configs.locals.total_partition)}
   proxmox         = ${jsonencode(local.configs.locals.proxmox)}
-  internet        = ${jsonencode(local.configs.locals.internet)}
-  internal        = ${jsonencode(local.configs.locals.internal)}
-  gateway         = ${jsonencode(local.configs.locals.gateway)}
-  postgres        = ${jsonencode(local.configs.locals.postgres)}
 }
 EOF
 }

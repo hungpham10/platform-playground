@@ -1,0 +1,11 @@
+role_users:
+  search:
+    - name: redis
+      uid: 2003
+      groups: ['redis']
+      ssh_keys: []
+
+role_groups:
+  search:
+    - name: redis
+      gid: 2003

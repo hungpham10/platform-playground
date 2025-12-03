@@ -38,3 +38,36 @@
   roles:
     - role: redis
       tags: ["redis"]
+
+  post_tasks:
+    - name: Write key to master
+      command: redis-cli -p {{ redis_port | default(6379) }} SET ansible_test_key xin_chao_tu_{{ inventory_hostname }}_{{ ansible_date_time.iso8601 }}
+      when: inventory_hostname in groups['master']
+      delegate_to: "{{ groups['master'][0] }}"
+
+    - name: Read from every nodes
+      command: redis-cli -h {{ inventory_hostname }} -p {{ redis_port | default(6379) }} GET ansible_test_key
+      register: read_test_key
+      changed_when: false
+
+    - name: Check replication lag
+      command: redis-cli -h {{ inventory_hostname }} -p {{ redis_port | default(6379) }} INFO REPLICATION
+      register: repl_info
+      changed_when: false
+      when: inventory_hostname in groups['replicas']
+
+    - name: Parse and check master_link_status + lag
+      assert:
+        that:
+          - "'master_link_status:up' in repl_info.stdout"
+          - "'master_sync_in_progress:0' in repl_info.stdout"
+          - master_lag_seconds <= 5
+        fail_msg: >-
+          Replica {{ inventory_hostname }} lỗi replication!
+          Link: {{ 'DOWN' if 'master_link_status:up' not in repl_info.stdout else 'UP' }}
+          Sync: {{ 'đang sync' if 'master_sync_in_progress:1' in repl_info.stdout else 'hoàn tất' }}
+          Lag: {{ master_lag_seconds }}s
+      vars:
+        master_lag_seconds: >-
+          {{ (repl_info.stdout | regex_search('master_last_io_seconds_ago:(\d+)') | default('0')) | int }}
+      when: inventory_hostname in groups['replicas']

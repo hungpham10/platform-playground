@@ -36,19 +36,9 @@
     - role: loadbalancer/ipvs
       vars:
         ipvs_virtual_ip: "{{ k8s_master_public }}"
-        ipvs_virtual_services:
-          - name: kube-apiserver
-            port: 6443
-            protocol: tcp
-            scheduler: wrr
-            real_servers: >-
-              {%- set rs = [] -%}
-              {%- for ip in groups['k8s-master-*'] | map('extract', hostvars, ['ansible_facts', 'default_ipv4', 'address']) | unique | list -%}
-              {{ rs.append({'address': ip, 'port': 6443, 'weight': 100}) }}
-              {%- endfor -%}
-              {{ rs }}
+        ipvs_virtual_services: "{{ k8s_virual_services }}"
         ipvs_vrrp_interface: "{{ network_interfaces[0].name | default('eth0') }}"
-      when: k8s_master_public is defined
+      when: k8s_master_public is defined and k8s_virual_services is defined
       tags: ["loadbalance"]
 
     - role: kubernetes/master
