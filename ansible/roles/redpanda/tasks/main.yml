@@ -1,0 +1,72 @@
+- name: Set redpanda_node_id fact for all scylla nodes
+  ansible.builtin.set_fact:
+    redpanda_node_id: "{{ groups['redpanda-nodes'].index(inventory_hostname) + 1 }}"
+  delegate_to: "{{ inventory_hostname }}"
+  when: inventory_hostname in groups['redpanda-nodes']
+
+- name: Create Redpanda directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: redpanda
+    group: redpanda
+  loop:
+    - "{{ redpanda_conf }}"
+    - "{{ redpanda_data }}"
+
+- name: Render Redpanda configuration
+  template:
+    src: redpanda.yaml.j2
+    dest: /etc/redpanda/redpanda.yaml
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart Redpanda
+
+- name: Choose Redpanda to run in production
+  command: rpk redpanda mode production
+  register: mod_setup_result
+  failed_when: mod_setup_result.rc != 0
+  changed_when: mod_setup_result.rc == 0
+  timeout: 600
+
+- name: Render sysconfig/redpanda
+  template:
+    src: redpanda.j2
+    dest: "/etc/sysconfig/redpanda"
+  notify: Restart Redpanda
+  when: ansible_os_family == "RedHat"
+
+- name: Render default/redpanda
+  template:
+    src: redpanda.j2
+    dest: "/etc/default/redpanda"
+  notify: Restart Redpanda
+  when: ansible_os_family == "RedHat"
+
+- name: Check if file /proc/sys/net/core/rps_sock_flow_entries exists
+  stat:
+    path: "/proc/sys/net/core/rps_sock_flow_entries"
+  register: file_check_result
+  become: false
+
+- name: Tuning Linux kernel to run with current Redpanda
+  command: rpk redpanda tune all
+  when: file_check_result.stat.exists 
+  register: krn_setup_result
+  failed_when: krn_setup_result.rc != 0
+  changed_when: krn_setup_result.rc == 0
+  timeout: 600
+
+- name: Start and enable redpanda-tuner
+  systemd:
+    name: redpanda-tuner
+    state: started
+    enabled: yes
+  when: file_check_result.stat.exists 
+
+- name: Start and enable redpanda
+  systemd:
+    name: redpanda
+    state: started
+    enabled: yes

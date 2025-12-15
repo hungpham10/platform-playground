@@ -47,7 +47,7 @@
   assert:
     that:
       - postgres_wal_level in ['replica', 'logical']
-  when: postgres_replication_role in ['master', 'standby']
+  when: postgres_replication_role in ['postgres-master', 'postgres-standby']
   notify: restart postgresql
 
 - name: Configure PostgreSQL replication
@@ -57,7 +57,7 @@
     owner: postgres
     group: postgres
     mode: '0600'
-  when: postgres_replication_role in ['master', 'standby']
+  when: postgres_replication_role in ['postgres-master', 'postgres-standby']
   notify: restart postgresql
 
 - name: Create standby.signal file
@@ -67,78 +67,67 @@
     owner: postgres
     group: postgres
     mode: '0644'
-  when: postgres_replication_role == 'standby'
+  when: postgres_replication_role == 'postgres-standby'
 
-- name: Create replication slot on master
-  postgresql_slot:
-    name: "{{ item | regex_replace('-', '_') }}_slot"
-    slot_type: physical
-    state: present
-  loop: "{{ groups['postgres-standby'] }}"
-  when: 
-    - postgres_replication_role == 'master'
-    - inventory_hostname == groups['postgres-master'][0]
-  become: true
-  become_user: postgres
+- name: Create failover management scripts
+  template:
+    src: "{{ item.src }}"
+    dest: "{{ postgres_script_dir }}/{{ item.dest }}"
+    owner: postgres
+    group: postgres
+    mode: '0700'
+  loop:
+    - { src: promote-to-master.sh.j2, dest: promote-to-master.sh }
+    - { src: demote-to-standby.sh.j2, dest: demote-to-standby.sh }
+    - { src: check-replication.sh.j2, dest: check-replication.sh }
+  when: postgres_replication_role in ['postgres-master', 'postgres-standby']
 
-- name: Create replication user on master
-  postgresql_user:
-    name: "{{ postgres_replication_user }}"
-    password: "{{ postgres_replication_password }}"
-    role_attr_flags: REPLICATION,LOGIN
-    state: present
-  when: 
-    - postgres_replication_role == 'master'
-    - inventory_hostname == groups['postgres-master'][0]
-  become: true
-  become_user: postgres
-  no_log: true
+- name: Start and enable PostgreSQL
+  systemd:
+    name: "{{ postgres_service }}@{{ postgres_version }}-main"
+    state: started
+    enabled: yes
+    daemon_reload: yes
 
-- name: Set password for postgres user
-  postgresql_user:
-    name: postgres
-    password: "{{ postgres_admin_password }}"
-    state: present
-  become: true
-  become_user: postgres
-  no_log: true
-  when: 
-    - postgres_replication_role != 'standby'
+- name: Configure backup system
+  include_tasks: backup.yml
+  when:
+    - postgres_enable_backup | default(true)
+    - postgres_replication_role != 'postgres-standby'
 
-- name: Create PostgreSQL users
-  postgresql_user:
-    name: "{{ item.name }}"
-    password: "{{ item.password }}"
-    role_attr_flags: "{{ item.flags | default('NOSUPERUSER,NOCREATEDB') }}"
-    state: present
-  loop: "{{ postgres_users | default([]) }}"
-  become: true
-  become_user: postgres
-  no_log: true
-  when: 
-    - postgres_replication_role != 'standby'
+- name: Restart PostgreSQL service
+  systemd:
+    name: "{{ postgres_service }}@{{ postgres_version }}-main"
+    state: restarted
+    enabled: yes
 
-- name: Create PostgreSQL databases
-  postgresql_db:
-    name: "{{ item.name }}"
-    owner: "{{ item.owner }}"
-    encoding: "{{ item.encoding | default('UTF-8') }}"
-    template: "{{ item.template | default('template0') }}"
-    state: present
-  loop: "{{ postgres_databases | default([]) }}"
-  become: true
-  become_user: postgres
+- name: Wait for PostgreSQL port to be open on master (only on standby)
+  wait_for:
+    host: "{{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}"
+    port: 5432
+    delay: 10
+    timeout: 300
+  when:
+    - postgres_replication_role == 'postgres-standby'
+    - groups['postgres-master'] is defined
+    - groups['postgres-master'] | length > 0
 
-- name: Check if replication slot is active
-  community.postgresql.postgresql_query:
+- name: Check if master PostgreSQL is accepting connections
+  community.postgresql.postgresql_ping:
     db: postgres
-    login_user: postgres
-    login_host: "127.0.0.1" 
-    login_password: "{{ postgres_admin_password }}"
-    query: "SELECT active FROM pg_replication_slots WHERE slot_name = '{{ inventory_hostname | regex_replace('-', '_') }}_slot';"
-  register: slot_status
-  run_once: true
-  when: "'postgres-master' in groups and groups['postgres-master'] | length > 0"
+    login_host: "{{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}"
+    login_user: "{{ postgres_replication_user }}"
+    login_password: "{{ postgres_replication_password }}"
+  delegate_to: "{{ inventory_hostname }}"
+  run_once: false
+  when:
+    - postgres_replication_role == 'standby'
+    - groups['postgres-master'] is defined
+    - groups['postgres-master'] | length > 0
+  retries: 30
+  delay: 10
+  register: pg_ping
+  until: pg_ping is success
 
 - name: Setup base backup for standby
   block:
@@ -162,59 +151,80 @@
       become_user: postgres
       environment:
         PGPASSWORD: "{{ postgres_replication_password | default ('123456') }}"
-      when: postgres_replication_role == 'standby'
+      when: postgres_replication_role == 'postgres-standby'
   when:
-    - postgres_replication_role == 'standby'
+    - postgres_replication_role == 'postgres-standby'
     - slot_status.query_result[0].active is defined
     - not slot_status.query_result[0].active
 
-- name: Create failover management scripts
-  template:
-    src: "{{ item.src }}"
-    dest: "{{ postgres_script_dir }}/{{ item.dest }}"
-    owner: postgres
-    group: postgres
-    mode: '0700'
-  loop:
-    - { src: promote-to-master.sh.j2, dest: promote-to-master.sh }
-    - { src: demote-to-standby.sh.j2, dest: demote-to-standby.sh }
-    - { src: check-replication.sh.j2, dest: check-replication.sh }
-  when: postgres_replication_role in ['master', 'standby']
+- name: Create replication slot on master
+  postgresql_slot:
+    name: "{{ item | regex_replace('-', '_') }}_slot"
+    slot_type: physical
+    state: present
+  loop: "{{ groups['postgres-standby'] }}"
+  when: 
+    - postgres_replication_role == 'postgres-master'
+    - inventory_hostname == groups['postgres-master'][0]
+  become: true
+  become_user: postgres
 
-- name: Create systemd override directory
-  file:
-    path: "/etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d"
-    state: directory
-    mode: '0755'
+- name: Create replication user on master
+  postgresql_user:
+    name: "{{ postgres_replication_user }}"
+    password: "{{ postgres_replication_password }}"
+    role_attr_flags: REPLICATION,LOGIN
+    state: present
+  when: 
+    - postgres_replication_role == 'postgres-master'
+    - inventory_hostname == groups['postgres-master'][0]
+  become: true
+  become_user: postgres
+  no_log: true
 
-- name: Create override.conf for custom config path
-  copy:
-    dest: "/etc/systemd/system/{{ postgres_service }}@{{ postgres_version }}-main.service.d/override.conf"
-    content: |
-      [Unit]
-      AssertPathExists=/var/lib/postgresql/%I/postgresql.conf
-      RequiresMountsFor=/var/lib/postgresql/%I
+- name: Set password for postgres user
+  postgresql_user:
+    name: postgres
+    password: "{{ postgres_admin_password }}"
+    state: present
+  become: true
+  become_user: postgres
+  no_log: true
+  when: 
+    - postgres_replication_role != 'postgres-standby'
 
-      [Service]
-      ExecStart=
-      ExecStart=/usr/bin/pg_ctlcluster --skip-systemctl-redirect -o "-c config_file=/var/lib/postgresql/%I/postgresql.conf" %i start
-  notify: daemon reload
+- name: Create PostgreSQL users
+  postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: "{{ item.flags | default('NOSUPERUSER,NOCREATEDB') }}"
+    state: present
+  loop: "{{ postgres_users | default([]) }}"
+  become: true
+  become_user: postgres
+  no_log: true
+  when: 
+    - postgres_replication_role != 'postgres-standby'
 
-- name: Start and enable PostgreSQL
-  systemd:
-    name: "{{ postgres_service }}@{{ postgres_version }}-main"
-    state: started
-    enabled: yes
-    daemon_reload: yes
+- name: Create PostgreSQL databases
+  postgresql_db:
+    name: "{{ item.name }}"
+    owner: "{{ item.owner }}"
+    encoding: "{{ item.encoding | default('UTF-8') }}"
+    template: "{{ item.template | default('template0') }}"
+    state: present
+  loop: "{{ postgres_databases | default([]) }}"
+  become: true
+  become_user: postgres
 
-- name: Configure backup system
-  include_tasks: backup.yml
-  when:
-    - postgres_enable_backup | default(true)
-    - postgres_replication_role != 'standby'
+- name: Check if replication slot is active
+  community.postgresql.postgresql_query:
+    db: postgres
+    login_user: postgres
+    login_host: "127.0.0.1" 
+    login_password: "{{ postgres_admin_password }}"
+    query: "SELECT active FROM pg_replication_slots WHERE slot_name = '{{ inventory_hostname | regex_replace('-', '_') }}_slot';"
+  register: slot_status
+  run_once: true
+  when: "'postgres-master' in groups and groups['postgres-master'] | length > 0"
 
-- name: Restart PostgreSQL service
-  systemd:
-    name: "{{ postgres_service }}@{{ postgres_version }}-main"
-    state: restarted
-    enabled: yes

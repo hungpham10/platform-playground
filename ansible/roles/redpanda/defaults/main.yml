@@ -1,0 +1,13 @@
+# Directories
+redpanda_conf: "/etc/redpanda"
+redpanda_data: "/var/lib/redpanda/data"
+
+# Resource 
+redpanda_smp: 1
+redpanda_memory: 1G
+
+# Listening addresses
+redpanda_kafka_port: 9092
+redpanda_rpc_port: 33145
+redpanda_proxy_port: 8082   # Panda Proxy (REST)
+redpanda_schema_port: 8081  # Schema Registry

@@ -6,6 +6,7 @@
   become: true
   vars:
     instance_role: eventdriver
+    subdomain_instance_role: kafka
     use_ssl: false
 
   pre_tasks:

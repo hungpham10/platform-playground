@@ -1,0 +1,9 @@
+---
+- name: Restart Redpanda
+  systemd:
+    name: "redpanda"
+    state: restarted
+
+- name: Daemon reload
+  systemd:
+    daemon_reload: yes

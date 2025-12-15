@@ -67,12 +67,28 @@
     src: scylla-server.j2
     dest: "/etc/sysconfig/scylla-server"
   notify: Restart ScyllaDB
+  when: ansible_os_family == "RedHat"
+
+- name: Render default/scylla-server
+  template:
+    src: scylla-server.j2
+    dest: "/etc/sysconfig/scylla-server"
+  notify: Restart ScyllaDB
+  when: ansible_os_family == "Debian"
 
 - name: Render sysconfig/scylla-jmx
   template:
     src: scylla-jmx.j2
     dest: "/etc/sysconfig/scylla-jmx"
   notify: Restart ScyllaDB
+  when: ansible_os_family == "RedHat"
+
+- name: Render default/scylla-jmx
+  template:
+    src: scylla-jmx.j2
+    dest: "/etc/default/scylla-jmx"
+  notify: Restart ScyllaDB
+  when: ansible_os_family == "Debian"
 
 - name: Render cassandra-rackdc.properties
   template:

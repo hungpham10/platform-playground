@@ -1,16 +1,42 @@
 role_packages:
-  eventdriver:
+  kafka:
     yum:
       - java-17-openjdk
     apt:
       - openjdk-17-jdk
-
-role_package_repos:
-  eventdriver:
-    yum: []
-    apt: []
+  redpanda:
+    yum:
+      - redpanda
+    apt:
+      - redpanda
 
 role_public_signing_keys:
-  eventdriver:
+  kafka:
     yum: []
     apt: []
+  redpanda:
+    yum: []
+    apt:
+      - url: "https://dl.redpanda.com/public/redpanda/gpg.988A7B0A4918BC85.key"
+        key: "redpanda-redpanda-archive-keyring.gpg"
+        dearmor: true
+        state: present
+
+role_package_repos:
+  kafka:
+    yum: []
+    apt: []
+  redpanda:
+    yum:
+      - name: redpanda-redpanda
+        baseurl: https://dl.redpanda.com/public/redpanda/rpm/el/9/$basearch
+        gpgkey: https://dl.redpanda.com/public/redpanda/gpg.988A7B0A4918BC85.key
+        gpgcheck: yes
+        enabled: yes
+      - name: redpanda-redpanda-noarch
+        baseurl: https://dl.redpanda.com/public/redpanda/rpm/el/9/noarch
+        gpgkey: https://dl.redpanda.com/public/redpanda/gpg.988A7B0A4918BC85.key
+        gpgcheck: yes
+        enabled: yes
+    apt:
+      - "deb [signed-by=/usr/share/keyrings/redpanda-redpanda-archive-keyring.gpg] https://dl.redpanda.com/public/redpanda/deb/ubuntu {{ ansible_distribution_release }} main"

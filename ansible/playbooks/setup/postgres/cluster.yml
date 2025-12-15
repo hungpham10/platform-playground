@@ -4,6 +4,8 @@
 - name: Configure PostgreSQL Database Servers
   hosts: postgres-*
   become: true
+  strategy: free
+  serial: 1
   vars:
     instance_role: database
     postgres_db: postgres

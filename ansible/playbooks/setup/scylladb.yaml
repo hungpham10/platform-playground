@@ -37,7 +37,7 @@
   roles:
     - name: scylladb
       vars:
-        cluster_name: "test"
+        cluster_name: "Trackity"
       tags: ["database", "scylladb"]
 
   post_tasks:

@@ -1,14 +1,28 @@
 ---
 firewall_rules:
-  tcp_ports:
-    - port: 9093
-      comment: "Kafka controller"
-    - port: 9092
-      comment: "Kafka broker"
-    - port: 2181
-      comment: "Zookeeper client"
-    - port: 2888
-      comment: "Zookeeper Leader Election Follower Connection"
-    - port: 3888
-      comment: "Zookeeper Leader Election"
-  custom: []
+  kafka:
+    tcp_ports:
+      - port: 9093
+        comment: "Kafka controller"
+      - port: 9092
+        comment: "Kafka broker"
+      - port: 2181
+        comment: "Zookeeper client"
+      - port: 2888
+        comment: "Zookeeper Leader Election Follower Connection"
+      - port: 3888
+        comment: "Zookeeper Leader Election"
+    custom: []
+  redpanda:
+    tcp_ports:
+      - port: 8081
+        comment: "Schema Registry"
+      - port: 8082
+        comment: "HTTP Proxy"
+      - port: 9092
+        comment: "Kafka API"
+      - port: 9644
+        comment: "Prometheus and Admin API"
+      - port: 33145
+        comment: "Internal RPC"
+    custom: []

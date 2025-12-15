@@ -1,0 +1,36 @@
+redpanda:
+  data_directory: "{{ redpanda_data }}"
+  node_id: {{ redpanda_node_id }}
+  rpc_server:
+    address: {{ ansible_host }}
+    port: {{ redpanda_rpc_port }}
+  kafka_api:
+    - address: 0.0.0.0
+      port: {{ redpanda_kafka_port }}
+  advertised_kafka_api:
+    - address: {{ ansible_host }}
+      port: {{ redpanda_kafka_port }}
+  seed_servers:
+{% for host in groups['redpanda-nodes'] %}
+    - host:
+        address: {{ hostvars[host]['full_hostname'] | default(hostvars[host]['ansible_host']) }}
+        port: {{ redpanda_rpc_port }}
+{% endfor %}
+
+  # PandaProxy & Schema Registry (tùy chọn bật)
+  pandaproxy:
+    pandaproxy_api:
+      - address: 0.0.0.0
+        port: {{ redpanda_proxy_port }}
+    advertised_pandaproxy_api:
+      - address: {{ ansible_host }}
+        port: {{ redpanda_proxy_port }}
+
+  schema_registry:
+    schema_registry_api:
+      - address: 0.0.0.0
+        port: {{ redpanda_schema_port }}
+
+  developer_mode: false
+  enable_memory_locking: true
+  auto_create_topics_enabled: true

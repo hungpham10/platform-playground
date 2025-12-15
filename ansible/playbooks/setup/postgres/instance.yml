@@ -66,8 +66,8 @@
       tags: ["database", "postgres"]
 
     # PostgreSQL Citus stup
-    - role: postgres/citus
-      tags: ["database", "postgres"]
+    #- role: postgres/citus
+    #  tags: ["database", "postgres"]
 
     # Configure PostgreSQL logging
     - role: logrotate
@@ -145,7 +145,7 @@
         become_user: postgres
         register: pg_connect
         failed_when: pg_connect.rc != 0
-        when: (subdomain_instance_role | default('standalone')) != "standby"
+        when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
 
       - name: Check if PostgreSQL port 5432 is open
         ansible.builtin.command:
@@ -167,14 +167,14 @@
           cmd: pgbackrest version
         register: pgbackrest_version
         failed_when: pgbackrest_version.rc != 0
-        when: (subdomain_instance_role | default('standalone')) != "standby"
+        when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
 
       - name: Check if pgBackRest configuration file exists
         ansible.builtin.stat:
           path: /etc/pgbackrest/pgbackrest.conf
         register: pgbackrest_conf
         failed_when: not pgbackrest_conf.stat.exists or pgbackrest_conf.stat.mode != '0640'
-        when: (subdomain_instance_role | default('standalone')) != "standby"
+        when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
 
       - name: Check if pgBackRest stanza exists
         ansible.builtin.command:
@@ -183,7 +183,7 @@
         become_user: postgres
         register: pgbackrest_stanza
         failed_when: pgbackrest_stanza.rc != 0
-        when: (subdomain_instance_role | default('standalone')) != "standby"
+        when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
 
       - name: Check if pgBackRest check command succeeds
         ansible.builtin.command:
@@ -192,5 +192,5 @@
         become_user: postgres
         register: pgbackrest_check
         failed_when: pgbackrest_check.rc != 0
-        when: (subdomain_instance_role | default('standalone')) != "standby"
+        when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
       tags: ["verify", "monitoring"]

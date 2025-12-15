@@ -11,7 +11,13 @@ role_public_signing_keys:
     apt: []
 
   # PostgreSQL repository GPG keys
-  postgres:
+  postgres-master:
+    yum: []
+    apt:
+      - url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
+        key: postgresql.asc
+        state: present
+  postgres-standby:
     yum: []
     apt:
       - url: "https://www.postgresql.org/media/keys/ACCC4CF8.asc"
@@ -36,7 +42,11 @@ role_package_repos:
       - "deb [arch=amd64,arm64 signed-by=/usr/share/keyrings/scylladb.gpg] https://downloads.scylladb.com/downloads/scylla/deb/debian-ubuntu/scylladb-2025.3 stable main"
 
   # PostgreSQL official repositories
-  postgres:
+  postgres-master:
+    yum: []
+    apt:
+      - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+  postgres-standby:
     yum: []
     apt:
       - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
@@ -49,7 +59,7 @@ role_packages:
     apt: []
 
   # Required packages for PostgreSQL database servers
-  postgres:
+  postgres-master:
     yum: []
     apt:
       # Core PostgreSQL packages
@@ -89,13 +99,52 @@ role_packages:
       - postgresql-{{ postgres_version }}-cron
       - postgresql-{{ postgres_version }}-partman
 
-      # Sharding tools
-      - postgresql-{{ postgres_version }}-citus
-      - citus-toolkit
-
       # System utilities
       - net-tools
       - iotop
       - sysstat
 
+  postgres-standby:
+    yum: []
+    apt:
+      # Core PostgreSQL packages
+      - postgresql-{{ postgres_version }}
+      - postgresql-client-{{ postgres_version }}
+      - postgresql-contrib-{{ postgres_version }}
+      - postgresql-{{ postgres_version }}-repack
+      - libpq-dev
 
+      # PostgreSQL monitoring and logging
+      - pgbadger
+      - mailutils
+      - postfix
+
+      # Python database adapters
+      - python3-psycopg2
+      - python3-pip
+      
+      # Backup and recovery tools
+      - pgbackrest
+      - barman
+      
+      # Monitoring and administration
+      - pg-activity
+      - pgbadger
+      - pgtop
+      
+      # Connection pooling
+      - pgpool2
+      - postgresql-client    
+
+      # Full text search
+      - postgresql-{{ postgres_version }}-rum
+
+      # Performance tools
+      - postgresql-{{ postgres_version }}-hypopg
+      - postgresql-{{ postgres_version }}-cron
+      - postgresql-{{ postgres_version }}-partman
+
+      # System utilities
+      - net-tools
+      - iotop
+      - sysstat

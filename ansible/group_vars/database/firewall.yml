@@ -1,6 +1,11 @@
 
 firewall_default_rules:
-  postgres:
+  postgres-master:
+    tcp_ports:
+      - port: 5432
+        comment: "Postgresql server"
+    udp_ports: []
+  postgres-standby:
     tcp_ports:
       - port: 5432
         comment: "Postgresql server"

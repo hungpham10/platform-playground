@@ -4,6 +4,16 @@
     is_debian_based: "{{ ansible_os_family == 'Debian' }}"
     is_redhat_based: "{{ ansible_os_family == 'RedHat' }}"
 
+- name: APT | Add core packages
+  apt:
+    name: "{{ item }}"
+    state: present
+  ignore_errors: true
+  with_items:
+    - gpg
+  when:
+    - is_debian_based
+
 - name: Replace apt mirror on ubuntu
   become: true
   template:
@@ -52,18 +62,57 @@
   delay: 10
   until: aptnewkeys is success
 
-- name: APT | Add public signing keys
-  get_url:
+- name: APT | Add public signing keys (raw download)
+  ansible.builtin.get_url:
     url: "{{ item.url }}"
-    dest: "/usr/share/keyrings/{{ item.key }}"
-  with_items: "{{ linux_add_public_signing_keys }}"
+    dest: "/tmp/{{ item.key }}"
+    mode: "0644"
+  loop: "{{ linux_add_public_signing_keys }}"
   when:
     - linux_add_public_signing_keys | default([]) | length > 0
     - is_debian_based
-  register: aptnewkeys
+  register: apt_key_downloads
   retries: 3
   delay: 10
-  until: aptnewkeys is success
+  until: apt_key_downloads is succeeded
+
+- name: APT | Dearmor and place the key exactly like the official script (only when dearmor=true)
+  ansible.builtin.shell: >-
+    gpg --dearmor --yes -o "/usr/share/keyrings/{{ item.item.key }}" "/tmp/{{ item.item.key }}"
+  loop: "{{ apt_key_downloads.results }}"
+  when:
+    - linux_add_public_signing_keys | default([]) | length > 0
+    - is_debian_based
+    - item is succeeded
+    - item.item.dearmor | default(false)
+  retries: 3
+  delay: 10
+  until: dearmor_key is succeeded
+  register: dearmor_key
+
+- name: APT | Place key directly (without dearmoring) when dearmor is not requested
+  ansible.builtin.copy:
+    src: "/tmp/{{ item.item.key }}"
+    dest: "/usr/share/keyrings/{{ item.item.key }}"
+    mode: "0644"
+    remote_src: yes
+  loop: "{{ apt_key_downloads.results }}"
+  when:
+    - linux_add_public_signing_keys | default([]) | length > 0
+    - is_debian_based
+    - item is succeeded
+    - item.item.dearmor is not defined or not item.item.dearmor
+  register: direct_key_place
+  retries: 3
+  delay: 10
+  until: direct_key_place is succeeded
+
+- name: Clean up temporary downloaded keys
+  ansible.builtin.file:
+    path: "/tmp/{{ item.item.key }}"
+    state: absent
+  loop: "{{ apt_key_downloads.results }}"
+  when: item is succeeded
 
 - name: APT | Add new repositories to sources
   apt_repository:
