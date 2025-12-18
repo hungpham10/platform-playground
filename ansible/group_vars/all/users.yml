@@ -2,12 +2,12 @@
 # Base groups
 base_groups:
   - name: guest
-    gid: 2002
+    gid: 3002
 
 user_password_salt: "{{ linux_user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
 
 base_users:  
   - name: guest
-    uid: 2002
+    uid: 3002
     groups: ['guest']
     ssh_keys: []

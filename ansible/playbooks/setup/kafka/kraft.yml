@@ -2,7 +2,7 @@
 - import_playbook: ../../boilerplate.yml
 
 - name: Configure Kafka Instance
-  hosts: kafka-*
+  hosts: vmfc-kafka-sec-*
   become: true
   vars:
     instance_role: eventdriver

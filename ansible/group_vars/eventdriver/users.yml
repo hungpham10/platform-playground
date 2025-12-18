@@ -1,17 +1,17 @@
 role_users:
   eventdriver:
     - name: kafka
-      uid: 2003
+      uid: 3003
       groups: ['kafka']
       ssh_keys: []
     - name: zookeeper
-      uid: 2005
+      uid: 3005
       groups: ['zookeeper', 'kafka']
       ssh_keys: []
 
 role_groups:
   eventdriver:
     - name: kafka
-      gid: 2003
+      gid: 3003
     - name: zookeeper
-      gid: 2005
+      gid: 3005

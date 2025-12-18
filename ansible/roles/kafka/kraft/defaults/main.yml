@@ -14,7 +14,7 @@ kafka_listeners:
   broker: "PLAINTEXT://0.0.0.0:9092"
 kafka_inter_broker_listener_name: "PLAINTEXT"
 kafka_controller_listener_names: "CONTROLLER"
-kafka_advertised_listeners: "PLAINTEXT://{{ ansible_default_ipv4.address }}:9092"
+kafka_advertised_listeners: "PLAINTEXT://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092"
 
 # Cấu hình topic
 kafka_num_partitions: 3

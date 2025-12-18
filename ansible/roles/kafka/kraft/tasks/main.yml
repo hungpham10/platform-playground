@@ -5,7 +5,6 @@
   when: kafka_minor is version('3.3', '<')
 
 - name: Set kafka_node_id fact for all kafka nodes
-
   ansible.builtin.set_fact:
     kafka_node_id: "{{ groups['kafka-nodes'].index(inventory_hostname) + 1 }}"
   delegate_to: "{{ inventory_hostname }}"
@@ -36,7 +35,7 @@
 
 - name: Build kafka_controller_quorum_voters list
   set_fact:
-    kafka_controller_quorum_voters: "{{ kafka_controller_quorum_voters + [hostvars[item]['kafka_node_id'] | string + '@' + hostvars[item]['inventory_hostname'] + ':9093'] }}"
+    kafka_controller_quorum_voters: "{{ kafka_controller_quorum_voters + [hostvars[item]['kafka_node_id'] | string + '@' + (hostvars[item]['full_hostname'] | default(hostvars[item]['inventory_hostname'])) + ':9093'] }}"
   loop: "{{ groups['controllers'] }}"
 
 - name: Download Kafka binary

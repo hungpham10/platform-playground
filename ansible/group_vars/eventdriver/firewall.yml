@@ -1,5 +1,5 @@
 ---
-firewall_rules:
+firewall_default_rules:
   kafka:
     tcp_ports:
       - port: 9093
