@@ -12,15 +12,18 @@ node.id={{ kafka_node_id }}
 controller.quorum.voters={{ kafka_controller_quorum_voters | join(',') }}
 controller.listener.names={{ kafka_controller_listener_names }}
 
+# Setup SASL
+listener.security.protocol.map={{ kafka_listener_security_protocol_map }}
+
 # Cấu hình listeners dựa trên vai trò
 {% if kafka_process_roles == 'controller' %}
 listeners={{ kafka_listeners.controller }}
 {% elif kafka_process_roles == 'broker' %}
-listeners={{ kafka_listeners.broker }}
+listeners={{ kafka_listeners.broker }},{{ kafka_listeners.internal }}
 inter.broker.listener.name={{ kafka_inter_broker_listener_name }}
 advertised.listeners={{ kafka_advertised_listeners }}
 {% else %}
-listeners={{ kafka_listeners.broker }},{{ kafka_listeners.controller }}
+listeners={{ kafka_listeners.broker }},{{ kafka_listeners.internal }},{{ kafka_listeners.controller }}
 inter.broker.listener.name={{ kafka_inter_broker_listener_name }}
 controller.listener.names={{ kafka_controller_listener_names }}
 advertised.listeners={{ kafka_advertised_listeners }}
@@ -46,3 +49,39 @@ queued.max.requests={{ kafka_queued_max_requests }}
 log.retention.hours={{ kafka_log_retention_hours }}
 log.retention.bytes={{ kafka_log_retention_bytes }}
 log.segment.bytes={{ kafka_log_segment_bytes }}
+
+{% if kafka_sasl_mechanism is defined %}
+# SASL chỉ áp dụng cho listener CLIENT
+listener.name.external.sasl.enabled.mechanisms={{ kafka_sasl_mechanism.broker }}
+
+{% if kafka_sasl_mechanism.controller is defined %}
+# SASL chỉ áp dụng cho listener CONTROLLER
+sasl.mechanism.controller.protocol={{ kafka_sasl_mechanism.controller }}
+{% endif %}
+
+# SASL connection class và cấu hình
+listener.name.external.sasl.enabled.mechanisms={{ kafka_sasl_mechanism.broker }}
+{% if kafka_sasl_mechanism.broker == "PLAIN" %}
+listener.name.external.{{ kafka_sasl_mechanism.broker | lower }}.sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required \
+    username="{{ kafka_admin.user }}" \
+    password="{{ kafka_admin.password }}" \
+    user_{{ kafka_admin.user }}="{{ kafka_admin.password }}" \
+{% for user in (kafka_application | default([])) %}
+    user_{{ user.name }}="{{ user.password }}" \
+{% endfor %}
+    ;
+{% else %}
+listener.name.external.{{ kafka_sasl_mechanism.broker | lower }}.sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+    username="{{ kafka_admin.user }}";
+{% endif %}
+{% endif %}
+
+{% if kafka_sasl_mechanism is defined and kafka_acl_allow_everyone_if_no_acl is defined %}
+super.users=User:{{ kafka_admin.user }};User:ANONYMOUS
+
+# Bật ACL Authorizer (cho KRaft)
+authorizer.class.name=org.apache.kafka.metadata.authorizer.StandardAuthorizer
+
+# Deny by default: Nếu không có ACL nào match, deny access (an toàn hơn)
+allow.everyone.if.no.acl.found={{ kafka_acl_allow_everyone_if_no_acl }}
+{% endif %}

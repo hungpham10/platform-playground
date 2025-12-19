@@ -29,6 +29,22 @@
   when: 
     - firewall_enabled
     - firewall_rules.tcp_ports is defined
+    - item.scope | default('public') == 'public'
+
+- name: Configure Internal TCP ports (Cluster Only)
+  ufw:
+    rule: allow
+    proto: tcp
+    src: "{{ hostvars[item.0]['ansible_host'] }}"
+    port: "{{ item.1.port | string }}"
+    comment: "{{ item.1.comment | default('Internal Port') }} (Cluster Only)"
+  with_nested:
+    - "{{ ansible_play_hosts }}"
+    - "{{ firewall_rules.tcp_ports | default([]) }}"
+  when: 
+    - firewall_enabled
+    - firewall_rules.tcp_ports is defined
+    - item.1.scope | default('public') == 'internal'
 
 - name: Configure allowed UDP ports
   ufw:
@@ -40,6 +56,7 @@
   when:
     - firewall_enabled
     - firewall_rules.udp_ports is defined
+    - item.scope | default('public') == 'public'
 
 - name: Apply custom firewall rules
   ufw:

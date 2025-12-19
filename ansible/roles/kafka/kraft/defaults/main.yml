@@ -11,10 +11,23 @@ config_dir: "{{ install_dir }}/config/kraft"
 kafka_node_id: "{{ groups['kafka_nodes'].index(inventory_hostname) + 1 }}"
 kafka_listeners:
   controller: "CONTROLLER://0.0.0.0:9093"
-  broker: "PLAINTEXT://0.0.0.0:9092"
-kafka_inter_broker_listener_name: "PLAINTEXT"
+  broker: "EXTERNAL://0.0.0.0:9092"
+kafka_inter_broker_listener_name: "INTERNAL"
 kafka_controller_listener_names: "CONTROLLER"
-kafka_advertised_listeners: "PLAINTEXT://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092"
+kafka_advertised_listeners: "EXTERNAL://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092,INTERNAL://{{ full_hostname | default(ansible_default_ipv4.address) }}:9094"
+
+# Mapping streams
+kafka_listener_security_protocol_map: "EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+
+# Cấu hình ACL và SASL
+kafka_acl_allow_everyone_if_no_acl: false
+
+#kafka_sasl_mechanism:
+#  broker: PLAIN
+#kafka_admin:
+#  user: "admin"
+#  password: "rootroot"
+#kafka_application: []
 
 # Cấu hình topic
 kafka_num_partitions: 3

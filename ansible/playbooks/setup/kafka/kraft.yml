@@ -1,10 +1,27 @@
+
 ---
 - import_playbook: ../../boilerplate.yml
-
 - name: Configure Kafka Instance
-  hosts: vmfc-kafka-sec-*
+  hosts: all
   become: true
   vars:
+    kafka_listeners:
+      controller: "CONTROLLER://0.0.0.0:9093"
+      internal: "INTERNAL://0.0.0.0:9094"
+      broker: "EXTERNAL://0.0.0.0:9092"
+    kafka_listener_security_protocol_map: "EXTERNAL:SASL_PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+    kafka_sasl_mechanism:
+      broker: SCRAM-SHA-512
+    kafka_admin:
+      user: "admin"
+      password: "rootroot"
+    kafka_application: []
+    kafka_plantext_port: 9094
+    kafka_sasl_port: 9092
+    kafka_sasl_client_config: "/tmp/client-sasl.properties"
+    kafka_sasl_admin_config: "/tmp/admin-sasl.properties"
+    test_user: "testuser"
+    test_password: "testpass123"
     instance_role: eventdriver
     subdomain_instance_role: kafka
 
@@ -43,110 +60,325 @@
       tags: ["kafka"]
 
   post_tasks:
-    - name: Check if failover-test topic exists
-      ansible.builtin.shell:
-        cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server  {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --list --topic failover-test"
-      become_user: kafka
-      register: topic_check
-      retries: 3
-      delay: 5
-      until: topic_check.rc == 0
-      run_once: true
-      changed_when: false
-      ignore_errors: true
+    - name: Test port plaintext
+      block:
+        - name: Check if failover-test topic exists
+          ansible.builtin.shell:
+            cmd: "/opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} --list --topic failover-test"
+          become_user: kafka
+          register: topic_check
+          retries: 3
+          delay: 5
+          until: topic_check.rc == 0
+          run_once: true
+          changed_when: false
+          ignore_errors: true
 
-    - name: Create test topic for failover (replication factor = num controllers)
-      ansible.builtin.shell: |
-        set -o pipefail
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
-      become_user: kafka
-      run_once: true  # Chỉ chạy trên 1 node
-      register: topic_create
-      failed_when: topic_create.rc != 0 and 'TopicAlreadyExists' not in topic_create.stderr
-      when: "'failover-test' not in topic_check.stdout"
-    
-    - name: Produce test messages
-      ansible.builtin.shell: |
-        set -o pipefail
-        for i in {1..10}; do
-          echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test
-        done
-      become_user: kafka
-      run_once: true
-      register: produce_result
-    
-    - name: Consume and verify messages before failover
-      ansible.builtin.shell: |
-        set -o pipefail
-        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --topic failover-test --from-beginning --max-messages 10
-      become_user: kafka
-      run_once: true
-      register: consume_before
-      changed_when: false
-    
-    - name: Debug pre-failover consumption
-      ansible.builtin.debug:
-        msg: "Messages before failover: {{ consume_before.stdout_lines }}"
-    
-    - name: Simulate failover - Stop Kafka on first controller
-      ansible.builtin.systemd:
-        name: kafka
-        state: stopped
-      delegate_to: "{{ groups['controllers'][0] }}"  # Failover node đầu tiên
-      register: failover_stop
-    
-    - name: Wait for failover (give time for election ~10s)
-      ansible.builtin.pause:
-        seconds: 10
+        - name: Create test topic for failover (replication factor = num controllers)
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} --create --topic failover-test --partitions 3 --replication-factor {{ groups['controllers'] | length }} --config cleanup.policy=delete
+          become_user: kafka
+          run_once: true
+          register: topic_create
+          failed_when: topic_create.rc != 0 and 'TopicAlreadyExists' not in topic_create.stderr
+          when: "'failover-test' not in topic_check.stdout"
 
-    - name: Check cluster health after failover (quorum status)
-      ansible.builtin.shell: |
-        set -o pipefail
-        /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host'] }}:9092 describe --status
-      become_user: kafka
-      run_once: true
-      register: quorum_after
-      failed_when: quorum_after.rc != 0 or 'Leader' not in quorum_after.stdout  # Check có leader mới
-      changed_when: false
-    
-    - name: Consume messages after failover (verify no data loss)
-      ansible.builtin.shell: |
-        set -o pipefail
-        /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host']}}:9092 --topic failover-test --from-beginning --max-messages 10
-      become_user: kafka
-      run_once: true
-      register: consume_after
-      changed_when: false
-    
-    - name: Debug post-failover consumption and quorum
-      ansible.builtin.debug:
-        msg: |
-          Quorum after failover: {{ quorum_after.stdout }}
-          Messages after failover: {{ consume_after.stdout_lines }}
-    
-    - name: Restart failed controller for recovery
-      ansible.builtin.systemd:
-        name: kafka
-        state: started
-      delegate_to: "{{ groups['controllers'][0] }}"
-    
-    - name: Wait for recovery
-      ansible.builtin.pause:
-        seconds: 10
-    
-    - name: Final health check after recovery
-      ansible.builtin.shell: |
-        set -o pipefail
-        /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 describe --status
-      become_user: kafka
-      run_once: true
-      register: quorum_final
-      failed_when: quorum_final.rc != 0
-      changed_when: false
-    
-    - name: Cleanup test topic (optional)
-      ansible.builtin.shell: |
-        /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:9092 --delete --topic failover-test
-      become_user: kafka
-      run_once: true
-      ignore_errors: yes
+        - name: Produce test messages
+          ansible.builtin.shell: |
+            set -o pipefail
+            for i in {1..10}; do
+              echo "Test message $i" | /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} --topic failover-test
+            done
+          become_user: kafka
+          run_once: true
+          register: produce_result
+
+        - name: Consume and verify messages before failover
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} --topic failover-test --from-beginning --max-messages 10
+          become_user: kafka
+          run_once: true
+          register: consume_before
+          changed_when: false
+
+        - name: Debug pre-failover consumption
+          ansible.builtin.debug:
+            msg: "Messages before failover: {{ consume_before.stdout_lines }}"
+
+        - name: Simulate failover - Stop Kafka on first controller
+          ansible.builtin.systemd:
+            name: kafka
+            state: stopped
+          delegate_to: "{{ groups['controllers'][0] }}"
+          register: failover_stop
+
+        - name: Wait for failover (give time for election ~10s)
+          ansible.builtin.pause:
+            seconds: 10
+
+        - name: Check cluster health after failover (quorum status)
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host'] }}:{{ kafka_plantext_port }} describe --status
+          become_user: kafka
+          run_once: true
+          register: quorum_after
+          failed_when: quorum_after.rc != 0 or 'Leader' not in quorum_after.stdout
+          changed_when: false
+
+        - name: Consume messages after failover (verify no data loss)
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][1]]['ansible_host'] }}:{{ kafka_plantext_port }} --topic failover-test --from-beginning --max-messages 10
+          become_user: kafka
+          run_once: true
+          register: consume_after
+          changed_when: false
+
+        - name: Debug post-failover consumption and quorum
+          ansible.builtin.debug:
+            msg: |
+              Quorum after failover: {{ quorum_after.stdout }}
+              Messages after failover: {{ consume_after.stdout_lines }}
+
+        - name: Restart failed controller for recovery
+          ansible.builtin.systemd:
+            name: kafka
+            state: started
+          delegate_to: "{{ groups['controllers'][0] }}"
+
+        - name: Wait for recovery
+          ansible.builtin.pause:
+            seconds: 10
+
+        - name: Final health check after recovery
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-metadata-quorum.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} describe --status
+          become_user: kafka
+          run_once: true
+          register: quorum_final
+          failed_when: quorum_final.rc != 0
+          changed_when: false
+
+        - name: Cleanup test topic (optional)
+          ansible.builtin.shell: |
+            /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ hostvars[groups['kafka-nodes'][0]]['ansible_host'] }}:{{ kafka_plantext_port }} --delete --topic failover-test
+          become_user: kafka
+          run_once: true
+          ignore_errors: yes
+      when: kafka_plantext_port is defined
+
+    - name: Test port sasl (auth + ACL restriction)
+      block:
+        - name: Create SASL admin config
+          ansible.builtin.copy:
+            dest: "{{ kafka_sasl_admin_config }}"
+            content: |
+              security.protocol=SASL_PLAINTEXT
+              sasl.mechanism={{ kafka_sasl_mechanism.broker }}
+              sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+                username="{{ kafka_admin.user }}" \
+                password="{{ kafka_admin.password }}";
+            mode: '0600'
+            owner: kafka
+          run_once: true
+
+        - name: Create SASL client config (ban đầu dùng admin)
+          ansible.builtin.copy:
+            dest: "{{ kafka_sasl_client_config }}"
+            content: |
+              security.protocol=SASL_PLAINTEXT
+              sasl.mechanism={{ kafka_sasl_mechanism.broker }}
+              sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+                username="{{ kafka_admin.user }}" \
+                password="{{ kafka_admin.password }}";
+            mode: '0600'
+            owner: kafka
+          run_once: true
+
+        # Dùng admin để tạo topic nếu chưa có (SASL)
+        - name: Ensure failover-test topic exists via SASL (admin)
+          ansible.builtin.shell: |
+            /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --create --topic failover-test --partitions 3 \
+              --replication-factor {{ groups['kafka-nodes'] | length }} \
+              --config cleanup.policy=delete \
+              --command-config {{ kafka_sasl_admin_config }}
+          become_user: kafka
+          run_once: true
+          register: topic_create_sasl
+          failed_when: topic_create_sasl.rc != 0 and 'TopicAlreadyExists' not in topic_create_sasl.stderr|default('')
+          ignore_errors: true  # Nếu đã tồn tại từ plaintext test thì ok
+
+        # Tạo SCRAM user testuser
+        - name: Create SCRAM user testuser
+          ansible.builtin.shell: |
+            /opt/kafka/bin/kafka-configs.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --alter --add-config 'SCRAM-SHA-512=[password={{ test_password }}]' \
+              --entity-type users --entity-name {{ test_user }} \
+              --command-config {{ kafka_sasl_admin_config }}
+          become_user: kafka
+          run_once: true
+          ignore_errors: true  # Idempotent
+
+        # Chuyển client config sang dùng testuser (chưa có ACL)
+        - name: Switch client config to testuser (no ACL yet)
+          ansible.builtin.copy:
+            dest: "{{ kafka_sasl_client_config }}"
+            content: |
+              security.protocol=SASL_PLAINTEXT
+              sasl.mechanism={{ kafka_sasl_mechanism.broker }}
+              sasl.jaas.config=org.apache.kafka.common.security.scram.ScramLoginModule required \
+                username="{{ test_user }}" \
+                password="{{ test_password }}";
+            mode: '0600'
+            owner: kafka
+          run_once: true
+
+        # Thử produce → PHẢI THẤT BẠI (no ACL)
+        - name: "[TEST 1] Produce with testuser - EXPECT FAIL (no ACL)"
+          ansible.builtin.shell: |
+            echo "Denied message" | /opt/kafka/bin/kafka-console-producer.sh \
+              --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --topic failover-test \
+              --producer.config {{ kafka_sasl_client_config }}
+          become_user: kafka
+          run_once: true
+          register: produce_denied
+          ignore_errors: true   # Cho phép chạy tiếp dù có lỗi
+
+        - name: Assert produce was denied (no ACL)
+          ansible.builtin.assert:
+            that: "'TopicAuthorizationException' in produce_denied.stderr"
+            fail_msg: "Produce succeeded without ACL - Security issue! (no TopicAuthorizationException in stderr)"
+            success_msg: "Produce correctly denied due to missing ACL"
+          run_once: true
+
+        # TEST 2: Consume - EXPECT FAIL (no ACL)
+        - name: "[TEST 2] Consume with testuser - EXPECT FAIL (no ACL)"
+          ansible.builtin.shell: |
+            timeout 10 /opt/kafka/bin/kafka-console-consumer.sh \
+              --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --topic failover-test --max-messages 1 \
+              --consumer.config {{ kafka_sasl_client_config }} || true
+          become_user: kafka
+          run_once: true
+          register: consume_denied
+          ignore_errors: true
+        
+        - name: Assert consume was denied (no ACL)
+          ansible.builtin.assert:
+            that: "'TopicAuthorizationException' in consume_denied.stderr"
+            fail_msg: "Consume succeeded without ACL - Security issue!"
+            success_msg: "Consume correctly denied due to missing ACL"
+          run_once: true
+
+        # CẤP ACL CHO testuser CHỈ VỚI topic failover-test
+        - name: Grant ACL to testuser - Topic operations (Read/Write/Describe)
+          ansible.builtin.shell: >
+            /opt/kafka/bin/kafka-acls.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }}
+            --command-config {{ kafka_sasl_admin_config }}
+            --add --allow-principal User:{{ test_user }}
+            --operation Read --operation Write --operation Describe
+            --topic failover-test
+          become_user: kafka
+          run_once: true
+          ignore_errors: true
+        
+        - name: Grant ACL to testuser - Consumer Group operations (Read/Describe on all groups)
+          ansible.builtin.shell: >
+            /opt/kafka/bin/kafka-acls.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }}
+            --command-config {{ kafka_sasl_admin_config }}
+            --add --allow-principal User:{{ test_user }}
+            --operation Read --operation Describe
+            --group '*'
+          become_user: kafka
+          run_once: true
+          ignore_errors: true
+
+        # Bây giờ produce → PHẢI THÀNH CÔNG
+        - name: "[TEST 3] Produce with testuser - EXPECT SUCCESS (with ACL)"
+          ansible.builtin.shell: |
+            set -o pipefail
+            for i in {1..10}; do
+              echo "Allowed message $i from {{ test_user }}" | /opt/kafka/bin/kafka-console-producer.sh \
+                --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+                --topic failover-test \
+                --producer.config {{ kafka_sasl_client_config }}
+            done
+          become_user: kafka
+          run_once: true
+
+        # Consume → THÀNH CÔNG
+        - name: "[TEST 4] Consume with testuser - EXPECT SUCCESS (with ACL)"
+          ansible.builtin.shell: |
+            set -o pipefail
+            /opt/kafka/bin/kafka-console-consumer.sh \
+              --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --topic failover-test --from-beginning --max-messages 10 \
+              --consumer.config {{ kafka_sasl_client_config }}
+          become_user: kafka
+          run_once: true
+          register: consume_allowed
+          changed_when: false
+
+        - name: Debug messages consumed by testuser
+          ansible.builtin.debug:
+            msg: "Messages consumed by {{ test_user }} (with ACL): {{ consume_allowed.stdout_lines }}"
+      when: kafka_sasl_port is defined and kafka_sasl_mechanism.broker is defined
+
+      # Cleanup luôn chạy nếu block SASL được thực thi
+      always:
+        - name: Cleanup - Delete testuser
+          ansible.builtin.shell: |
+            /opt/kafka/bin/kafka-configs.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --alter --delete-config 'SCRAM-SHA-512' \
+              --entity-type users --entity-name {{ test_user }} \
+              --command-config {{ kafka_sasl_admin_config }}
+          become_user: kafka
+          run_once: true
+          ignore_errors: true
+          when: kafka_sasl_port is defined
+
+        - name: Cleanup - Remove ACLs for topic failover-test (all principals)
+          ansible.builtin.shell: >
+            /opt/kafka/bin/kafka-acls.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }}
+            --command-config {{ kafka_sasl_admin_config }}
+            --remove --force
+            --topic failover-test
+          become_user: kafka
+          run_once: true
+          ignore_errors: true  # Idempotent: nếu không còn ACL nào thì báo lỗi nhưng ok
+
+        - name: Cleanup - Remove ACLs for consumer groups (all groups, all principals)
+          ansible.builtin.shell: >
+            /opt/kafka/bin/kafka-acls.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }}
+            --command-config {{ kafka_sasl_admin_config }}
+            --remove --force
+            --group '*'
+          become_user: kafka
+          run_once: true
+          ignore_errors: true
+
+        - name: Cleanup - Delete test topic (admin)
+          ansible.builtin.shell: |
+            /opt/kafka/bin/kafka-topics.sh --bootstrap-server {{ ansible_host }}:{{ kafka_sasl_port }} \
+              --delete --topic failover-test \
+              --command-config {{ kafka_sasl_admin_config }}
+          become_user: kafka
+          run_once: true
+          ignore_errors: true
+          when: kafka_sasl_port is defined
+
+        - name: Remove temporary SASL config files
+          ansible.builtin.file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - "{{ kafka_sasl_client_config }}"
+            - "{{ kafka_sasl_admin_config }}"
+          run_once: true
+          when: kafka_sasl_port is defined

@@ -58,6 +58,25 @@
   when:
     - firewall_enabled
     - firewall_rules.tcp_ports is defined
+    - item.scope | default('public') == 'public'
+
+- name: Configure Internal TCP ports (Rich Rules - Cluster Only)
+  firewalld:
+    zone: public
+    rich_rule: |
+      rule family="ipv4" 
+      source address="{{ hostvars[item.0]['ansible_host'] }}" 
+      port port="{{ item.1.port }}" protocol="tcp" accept
+    permanent: yes
+    state: enabled
+    immediate: yes
+  with_nested:
+    - "{{ ansible_play_hosts }}"
+    - "{{ firewall_rules.tcp_ports | default([]) }}"
+  when: 
+    - firewall_enabled
+    - firewall_rules.tcp_ports is defined
+    - item.1.scope | default('public') == 'internal'
 
 - name: Apply custom firewall rules (rich rules)
   firewalld:
