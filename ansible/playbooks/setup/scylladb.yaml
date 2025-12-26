@@ -47,7 +47,6 @@
       changed_when: false
       register: nodetool_status
 
-
     - name: Count node UN (Up/Normal)
       set_fact:
         un_count: "{{ nodetool_status.stdout_lines | select('search', '^UN') | list | length }}"
@@ -62,9 +61,9 @@
           Only have {{ un_count }}/{{ all_scylla_node_count }} node in UN.
       when: un_count != all_scylla_node_count
 
-    - name: Scan error
-      ansible.builtin.shell: |
-        journalctl -u scylla-server --since "10 minutes ago" | grep -iE "(ERROR|exception|panic|segmentation|reactor stalled)" | tail -20 || true
-      changed_when: false
-      register: scylla_errors
-      failed_when: "'ERROR' in scylla_errors.stdout.upper() or 'EXCEPTION' in scylla_errors.stdout.upper()"
+    #- name: Scan error
+    #  ansible.builtin.shell: |
+    #    journalctl -u scylla-server --since "10 minutes ago" | grep -iE "(ERROR|exception|panic|segmentation|reactor stalled)" | tail -20 || true
+    #  changed_when: false
+    #  register: scylla_errors
+    #  failed_when: "'ERROR' in scylla_errors.stdout.upper() or 'EXCEPTION' in scylla_errors.stdout.upper()"

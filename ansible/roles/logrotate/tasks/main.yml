@@ -29,9 +29,14 @@
     group: root
   notify: Restart logrotate
 
+- name: Generate rsyslog.conf
+  template:
+    src: rsyslog.conf.j2
+    dest: "/etc/rsyslog.conf"
+
 - name: Generate logrotate.d files
   template:
-    src: log-entry.conf.j2
+    src: logrotate-entry.conf.j2
     dest: "/etc/logrotate.d/{{ entry.name }}"
     mode: "0644"
     owner: root
@@ -43,9 +48,9 @@
     loop_var: entry
   notify: Restart logrotate
 
-- name: Configure postgres logging
+- name: Generate rsyslog.d files
   template:
-    src: rsyslog.conf.j2
+    src: rsyslog-entry.conf.j2
     dest: "/etc/rsyslog.d/{{ entry.rsyslog.id }}-{{ entry.rsyslog.program_name }}.conf"
     mode: '0644'
     owner: root

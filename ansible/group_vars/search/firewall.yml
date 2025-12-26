@@ -1,0 +1,14 @@
+firewall_default_rules:
+  search:
+    tcp_ports:
+      - port: 9200
+        comment: "Elasticsearch http server"
+        scope: internal
+      - port: 9300
+        comment: "Elasticsearch xpack server"
+        scope: internal
+      - port: 80
+        comment: "http nginx server"
+      - port: 443
+        comment: "https nginx server"
+    udp_ports: []

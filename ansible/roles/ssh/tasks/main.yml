@@ -15,6 +15,17 @@
   become_user: "{{ ssh_user }}"
   register: keygen_result
 
+- name: Wait for public key file to exist and have content
+  wait_for:
+    path: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}.pub"
+    state: present
+    search_regex: "^ssh-"   # đảm bảo file có nội dung hợp lệ (bắt đầu bằng ssh-rsa hoặc ssh-ed25519...)
+  delay: 2
+  timeout: 30
+  become: yes
+  become_user: "{{ ssh_user }}"
+  ignore_errors: no   # sẽ fail nếu quá 30s vẫn không có
+
 - name: Read public key from each node
   slurp:
     src: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}.pub"

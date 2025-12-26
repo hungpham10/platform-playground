@@ -28,5 +28,18 @@ firewall_default_rules:
       - port: 9644
         comment: "Prometheus and Admin API"
       - port: 33145
+        scope: internal
         comment: "Internal RPC"
+    custom: []
+  rabbitmq:
+    tcp_ports:
+      - port: 5672
+        comment: "AMQP"
+      - port: 15672
+        comment: "Management UI"
+      - port: 4369
+        comment: "EPMD"
+      - port: 25672
+        scope: internal
+        comment: "Cluster communication"
     custom: []

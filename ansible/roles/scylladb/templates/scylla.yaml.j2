@@ -10,8 +10,8 @@ data_file_directories:
 {% endfor %}
 
 commitlog_directory: {{ scylla_commit_log_path }}
-authenticator: PasswordAuthenticator
-authorizer: CassandraAuthorizer
+authenticator: {{ scylla_authenticator }}
+authorizer: {{ scylla_authorizer }}
 
 num_tokens: {{ number_of_tokens }}
 

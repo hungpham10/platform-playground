@@ -2,7 +2,7 @@
 - import_playbook: ../boilerplate.yml
 
 - name: Configure Elasticsearch Instance
-  hosts: es-*
+  hosts: all
   become: true
   vars:
     instance_role: search
@@ -62,6 +62,21 @@
     - role: elasticsearch
       tags: ["elasticsearch"]
 
+    - role: logrotate
+      vars:
+        logrotate_custom_entries:
+          - name: elasticsearch-log
+            path: "/var/log/elasticsearch/gc.log.*"
+            frequency: daily
+            options:
+              - daily
+              - rotate 10
+              - compress
+              - delaycompress
+              - missingok
+              - notifempty
+            create: "0640 elasticsearch elasticsearch"
+      tags: ["monitoring"]
   post_tasks:
     - name: Test kết nối và info cluster
       uri:

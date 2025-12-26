@@ -1,13 +1,12 @@
 ---
 - import_playbook: ../boilerplate.yml
 
-- name: Configure Redpanda Instance
+- name: Configure RabbitMQ Instance
   hosts: all
   become: true
   vars:
     instance_role: eventdriver
-    subdomain_instance_role: redpanda
-    use_ssl: false
+    subdomain_instance_role: rabbitmq
 
   pre_tasks:
     - name: Include role specific variables
@@ -35,7 +34,7 @@
       tags: ["always"]
 
   roles:
-    - role: redpanda
+    - role: rabbitmq
       vars:
-        kind: "server"
-      tags: ["redpanda"]
+        erlang_cookie: "GlAKxO1hcErroQhycsKIiiMrXuSWmNsAGaJkYNW0"
+      tags: ["rabbitmq"]

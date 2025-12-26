@@ -26,5 +26,17 @@ es_config:
   node.roles: "{{ roles_list }}"
   network.host: 0.0.0.0
   http.port: 9200
-  discovery.seed_hosts: "{{ groups['elasticsearch-nodes'] }}"
-  cluster.initial_master_nodes: "{{ groups['elasticsearch-master'] }}"
+  discovery.seed_hosts: "{{ 
+    (groups['elasticsearch-nodes'] + groups['elasticsearch-master']) 
+    | unique 
+    | map('extract', hostvars) 
+    | map(attribute='inventory_hostname') 
+    | unique 
+    | list 
+  }}" 
+  cluster.initial_master_nodes: "{{ 
+    groups['elasticsearch-master'] 
+    | map('extract', hostvars) 
+    | map(attribute='inventory_hostname') 
+    | list 
+  }}"

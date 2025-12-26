@@ -7,3 +7,5 @@ es_data_dir: "/var/lib/elasticsearch"
 es_log_dir: "/var/log/elasticsearch"
 
 nginx_home: "/etc/nginx/"
+nginx_port: 80
+nginx_server_name: "{{ full_hostname | default(ansible_host) }}"

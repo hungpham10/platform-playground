@@ -2,6 +2,7 @@ instances:
 {% for host in groups['elasticsearch-nodes'] %}
   - name: "{{ host }}"
     dns:
+      - "{{ hostvars[host]['full_hostname'] | default(host) }}"
       - "{{ host }}"
       - "localhost"
     ip:

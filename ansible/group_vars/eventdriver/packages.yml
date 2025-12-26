@@ -9,6 +9,11 @@ role_packages:
       - redpanda
     apt:
       - redpanda
+  rabbitmq:
+    yum:
+      - rabbitmq-server
+    apt:
+      - rabbitmq-server
 
 role_public_signing_keys:
   kafka:
@@ -19,6 +24,13 @@ role_public_signing_keys:
     apt:
       - url: "https://dl.redpanda.com/public/redpanda/gpg.988A7B0A4918BC85.key"
         key: "redpanda-redpanda-archive-keyring.gpg"
+        dearmor: true
+        state: present
+  rabbitmq:
+    yum: []
+    apt:
+      - url: "https://keys.openpgp.org/vks/v1/by-fingerprint/0A9AF2115F4687BD29803A206B73A36E6026DFCA"
+        key: "com.rabbitmq.team.gpg"
         dearmor: true
         state: present
 
@@ -39,4 +51,32 @@ role_package_repos:
         gpgcheck: yes
         enabled: yes
     apt:
-      - "deb [signed-by=/usr/share/keyrings/redpanda-redpanda-archive-keyring.gpg] https://dl.redpanda.com/public/redpanda/deb/ubuntu {{ ansible_distribution_release }} main"
+      - "deb [signed-by: /usr/share/keyrings/redpanda-redpanda-archive-keyring.gpg] https://dl.redpanda.com/public/redpanda/deb/ubuntu {{ ansible_distribution_release }} main"
+  rabbitmq:
+    yum:
+      - name: modern-erlang-el9
+        baseurl: https://yum1.rabbitmq.com/erlang/el/9/$basearch
+        enabled: yes
+        gpgkey: https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+        gpgcheck: yes
+      
+      - name: modern-erlang-el9-noarch
+        baseurl: https://yum1.rabbitmq.com/erlang/el/9/noarch
+        enabled: yes
+        gpgkey: https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-erlang.E495BB49CC4BBE5B.key
+        gpgcheck: yes
+
+      - name: rabbitmq-el9
+        baseurl: https://yum2.rabbitmq.com/rabbitmq/el/9/$basearch
+        repo_gpgcheck: yes
+        enabled: yes
+        gpgkey: https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+        gpgcheck: yes
+
+      - name: rabbitmq-el9-noarch
+        baseurl: https://yum2.rabbitmq.com/rabbitmq/el/9/noarch
+        enabled: yes
+        gpgkey: https://github.com/rabbitmq/signing-keys/releases/download/3.0/cloudsmith.rabbitmq-server.9F4587F226208342.key
+        gpgcheck: yes
+    apt: []
+

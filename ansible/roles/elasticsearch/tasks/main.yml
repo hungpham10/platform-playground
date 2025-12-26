@@ -55,6 +55,17 @@
     mode: 0660
   notify: Restart elasticsearch
 
+- name: Disable rotation GC log
+  copy:
+    dest: /etc/elasticsearch/jvm.options.d/gc-logging.options
+    content: |
+      ## Disable internal GC log rotation - let external logrotate handle it
+      -Xlog:gc*,gc+age=trace,safepoint:file=/var/log/elasticsearch/gc.log:utctime,pid,tags
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0664'
+  notify: Restart elasticsearch
+
 - name: Generate certificates on first master node
   become: true
   block:

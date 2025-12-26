@@ -1,0 +1,67 @@
+
+- name: Render Erlang cookie
+  copy:
+    content: "{{ erlang_cookie }}"
+    dest: /var/lib/rabbitmq/.erlang.cookie
+    owner: rabbitmq
+    group: rabbitmq
+    mode: '0400'
+  notify: Restart RabbitMQ
+
+- name: Render RabbitMQ env
+  template:
+    src: rabbitmq-env.conf.j2
+    dest: "{{ rabbitmq_config_dir }}/rabbitmq-env.conf"
+    owner: rabbitmq
+    group: rabbitmq
+  notify: Restart RabbitMQ
+
+- name: Enable RabbiMQ management
+  command: rabbitmq-plugins enable rabbitmq_management
+  when: inventory_hostname in groups['rabbitmq-master']
+
+- name: Start and enable RabbitMQ
+  systemd:
+    name: rabbitmq-server
+    state: restarted
+    enabled: yes
+
+- name: Wait service ready
+  wait_for:
+    host: "{{ inventory_hostname }}"
+    port: 5672
+    delay: 10
+    timeout: 120
+
+- name: Master - Reset and start app in master node
+  shell: |
+    rabbitmqctl stop_app
+    rabbitmqctl reset
+    rabbitmqctl start_app
+  when: inventory_hostname in groups['rabbitmq-master']
+  run_once: true
+
+- name: Slave - Stop app before join to new cluster
+  command: rabbitmqctl stop_app
+  when: inventory_hostname not in groups['rabbitmq-master']
+
+- name: Slave - Join slaves to master
+  command: rabbitmqctl join_cluster rabbit@{{ hostvars[groups['rabbitmq-master'][0]]['full_hostname'] | default(groups['rabbitmq-master'][0]) }}
+  register: join_result
+  failed_when: "'already_member' in join_result.stderr and 'clustering' not in join_result.stdout"
+  ignore_errors: yes
+  when: inventory_hostname not in groups['rabbitmq-master']
+
+- name: Slave - Start app
+  command: rabbitmqctl start_app
+  when: inventory_hostname not in groups['rabbitmq-master']
+
+- name: Check cluster status
+  command: rabbitmqctl cluster_status
+  when: inventory_hostname in groups['rabbitmq-master']
+  register: cluster_status
+
+- name: Show cluster status
+  debug:
+    msg: "{{ cluster_status.stdout_lines }}"
+  when: inventory_hostname in groups['rabbitmq-master']

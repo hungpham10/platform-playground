@@ -26,17 +26,6 @@
     state: enabled
   when: firewall_enabled
 
-- name: Configure allowed TCP ports
-  firewalld:
-    zone: public
-    port: "{{ item.port }}/tcp"
-    permanent: yes
-    state: enabled
-  loop: "{{ firewall_rules.tcp_ports | default([]) }}"
-  when: 
-    - firewall_enabled
-    - firewall_rules.tcp_ports is defined
-
 - name: Configure allowed UDP ports
   firewalld:
     zone: public

@@ -22,3 +22,6 @@ batch_size_fail_threshold_in_kb: 50
 
 internode_compression: "all"
 auto_snapshot: false
+
+scylla_authenticator: com.scylladb.auth.TransitionalAuthenticator
+scylla_authorizer: AllowAllAuthorizer
