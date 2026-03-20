@@ -1,0 +1,4 @@
+elastic-internal_cluster_manage:elastic-internal-pre-stop
+elastic_internal_probe_user:elastic-internal-probe
+remote_monitoring_collector:elastic-internal-monitoring
+superuser:elastic,elastic-internal

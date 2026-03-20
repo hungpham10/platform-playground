@@ -1,0 +1,7 @@
+---
+kafka_exporter_version: "1.7.0"
+kafka_exporter_port: 9308
+kafka_server: "localhost:9094"
+
+# Link download (có thể thay đổi tùy kiến trúc CPU)
+kafka_exporter_download_url: "https://github.com/danielqsj/kafka_exporter/releases/download/v{{ kafka_exporter_version }}/kafka_exporter-{{ kafka_exporter_version }}.linux-amd64.tar.gz"

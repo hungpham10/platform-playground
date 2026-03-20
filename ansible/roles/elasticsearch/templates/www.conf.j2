@@ -1,5 +1,5 @@
 upstream elasticsearch_ssl {
-    {% for item in groups['elasticsearch-master'] %}
+    {% for item in groups['elasticsearch-nodes'] %}
         {% set node_host = hostvars[item]['full_hostname'] 
                           if 'full_hostname' in hostvars[item] 
                           else hostvars[item]['ansible_host'] %}

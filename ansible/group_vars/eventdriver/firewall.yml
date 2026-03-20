@@ -10,6 +10,8 @@ firewall_default_rules:
         comment: "Kafka controller"
       - port: 9092
         comment: "Kafka external"
+      - port: 9308
+        comment: "Kafka exporter"
       - port: 2181
         comment: "Zookeeper client"
       - port: 2888

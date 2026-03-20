@@ -15,13 +15,14 @@ module(load="imjournal"             # provides access to the systemd journal
 module(load="imklog") # reads kernel messages (the same are read from journald)
 module(load="immark") # provides --MARK-- message capability
 
-# Include all config files in /etc/rsyslog.d/
-include(file="/etc/rsyslog.d/*.conf" mode="optional")
-
 # Provides UDP syslog reception
 # for parameters see http://www.rsyslog.com/doc/imudp.html
 module(load="imudp") # needs to be done just once
 input(type="imudp" port="514")
+
+# Include all config files in /etc/rsyslog.d/
+include(file="/etc/rsyslog.d/*.conf" mode="optional")
+
 
 #### RULES ####
 

@@ -24,6 +24,14 @@ role_public_signing_keys:
         key: postgresql.asc
         state: present
 
+  clickhouse:
+    yum: []
+    apt:
+      - url: "https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key"
+        key: "clickhouse-keyring.gpg"
+        dearmor: true
+        state: present
+
 role_package_repos:
   # ScyllaDB official repositories
   scylladb:
@@ -50,6 +58,24 @@ role_package_repos:
     yum: []
     apt:
       - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+
+  # Clichouse official repositories
+  clickhouse:
+    yum:
+      - name: "clickhouse-stable"
+        description: "ClickHouse - Stable Repository"
+        baseurl: "https://packages.clickhouse.com/rpm/stable/"
+        gpgkey: "https://packages.clickhouse.com/rpm/stable/repodata/repomd.xml.key"
+        gpgcheck: no
+        enabled: yes
+      - name: "clickhouse-lts"
+        description: "ClickHouse - LTS Repository"
+        baseurl: "https://packages.clickhouse.com/rpm/lts/"
+        gpgkey: "https://packages.clickhouse.com/rpm/lts/repodata/repomd.xml.key"
+        gpgcheck: no
+        enabled: yes
+    apt:
+      - "deb [signed-by=/usr/share/keyrings/clickhouse-keyring.gpg arch=amd64] https://packages.clickhouse.com/deb stable main"
 
 role_packages:
   # Required packages for ScyllaDB database servers
@@ -148,3 +174,9 @@ role_packages:
       - net-tools
       - iotop
       - sysstat
+
+  clickhouse:
+    yum:
+      - clickhouse-server
+    apt:
+      - clickhouse-server

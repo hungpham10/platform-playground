@@ -19,13 +19,13 @@ role_package_repos:
   search:
     yum:
       - name: elasticsearch
-        description: Elasticsearch repository for 8.x packages
-        baseurl: https://artifacts.elastic.co/packages/8.x/yum
+        description: Elasticsearch repository for 7.x packages
+        baseurl: https://artifacts.elastic.co/packages/7.x/yum
         gpgcheck: yes
         gpgkey: https://artifacts.elastic.co/GPG-KEY-elasticsearch
         enabled: yes
     apt:
-      - "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/9.x/apt stable main"
+      - "deb [signed-by=/usr/share/keyrings/elasticsearch-keyring.gpg] https://artifacts.elastic.co/packages/7.x/apt stable main"
 
 role_package_keys:
   search:

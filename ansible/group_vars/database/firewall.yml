@@ -31,3 +31,23 @@ firewall_default_rules:
       - port: 19142
         comment: "Scylla TLS Native shard-aware transport port"
     udp_ports: []
+  clickhouse:
+    tcp_ports:
+      - port: 9000
+        comment: "Clickhouse non-TLS native port"
+      - port: 9009
+        scope: internal
+        comment: "Clickhouse inter-link communication"
+      - port: 9440
+        comment: "Clickhouse TLS native port"
+      - port: 9363
+        comment: "Prometheus metrics"
+      - port: 2181
+        scope: internal
+        comment: "Zookeeper client"
+      - port: 2888
+        scope: internal
+        comment: "Zookeeper Leader Election Follower Connection"
+      - port: 3888
+        scope: internal
+        comment: "Zookeeper Leader Election"

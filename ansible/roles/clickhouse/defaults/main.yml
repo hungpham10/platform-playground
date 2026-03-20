@@ -1,0 +1,57 @@
+# Folders
+clickhouse_log_dir: "/var/log/clickhouse"
+clickhouse_data_dir: "/var/lib/clickhouse"
+clickhouse_conf_dir: "/etc/clickhouse-server"
+
+# Security
+clickhouse_http_port: 8123
+clickhouse_https_port: 8443
+clickhouse_tcp_port: 9000
+clickhouse_listen_host: "0.0.0.0"
+clickhouse_max_concurrent_queries: 1000
+clickhouse_manage_user_over_sql_tables: true
+
+# Account
+clickhouse_users:
+  - name: admin
+    password: "admin123"
+    networks: []
+    profile: admin_profile
+    quota: unlimited
+    access_management: 1
+    readonly: 0
+
+# Profile
+clickhouse_profiles:
+  admin_profile:
+    max_threads: 10
+    max_memory_usage: 10000000000  # 10GB
+    max_insert_block_size: 1048576
+    allow_introspection_functions: 0
+
+  dev_profile:
+    max_threads: 8
+    max_memory_usage: 1000000000   # 1GB
+    max_insert_block_size: 1048576
+
+  readonly:
+    readonly: 1
+    allow_ddl: 0
+    max_memory_usage: 2000000000   # 2GB
+
+# Quota
+clickhouse_quotas:
+  unlimited: {}  # no limit
+
+  dev_quota:
+    intervals:
+      - duration: 3600   # 1 giờ
+        queries: 10000
+        errors: 100
+        result_rows: 100000000
+
+  monitoring_quota:
+    intervals:
+      - duration: 3600
+        queries: 5000
+        errors: 50

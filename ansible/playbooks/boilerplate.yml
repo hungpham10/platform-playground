@@ -11,7 +11,17 @@
         extensions: ['yml', 'yaml']
       loop:
         - "../group_vars/all"
+      tags: ["always"]
+
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
         - "../group_vars/{{ instance_role }}"
+      when:
+        - instance_role is defined
       tags: ["always"]
 
     - name: Extend existing firewall rules with defaults
@@ -128,7 +138,9 @@
             ) +
             (host_public_signing_keys | default([]))
           }}
-      when: ansible_os_family == "RedHat"
+      when: 
+        - ansible_os_family == "RedHat"
+        - (enable_install_packages | bool)
       tags: ["system", "packages"]
 
     - role: pkg/apt
@@ -173,12 +185,14 @@
             ) +
             (host_package_key_ids | default([]))
           }}
-      when: ansible_os_family == "Debian"
+      when:
+        - ansible_os_family == "Debian"
+        - (enable_install_packages | bool)
       tags: ["system", "packages"]
 
     - role: netplan
       vars:
-        is_gateway_machine: "{{ instance_role == 'gateway' }}"
+        is_gateway_machine: "{{ instance_role | default('') == 'gateway' }}"
         net_interfaces: "{{ network_interfaces }}"
         enable_forwarding: "{{ network_defaults.enable_forwarding }}"
       when: (enable_netplan | bool)
@@ -283,6 +297,7 @@
             (host_specific_users | default([]))
           }}
         user_password_salt: "{{ user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
+      when: (enable_users | bool)
       tags: ["system", "users", "security"]
 
     - role: hardening
@@ -319,7 +334,7 @@
           register: mount_status
           failed_when: false
           changed_when: false
-          loop: "{{ instance_storage_devices | default([]) + storage_lvs | default([]) }}"
+          loop: "{{ instance_storage.devices | default([]) + storage_lvs | default([]) }}"
           when: item.state | default('present') == 'present'
 
         - name: Verify mounted filesystems

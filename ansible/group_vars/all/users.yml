@@ -1,5 +1,6 @@
 ---
 # Base groups
+enable_users: true
 base_groups:
   - name: guest
     gid: 3002

@@ -1,0 +1,4 @@
+- name: restart kafka-exporter
+  systemd:
+    name: kafka-exporter
+    state: restarted

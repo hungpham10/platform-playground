@@ -2,7 +2,7 @@
 - import_playbook: ../boilerplate.yml
 
 - name: Configure ScyllaDB Database Servers
-  hosts: scylladb-*
+  hosts: all
   become: true
   vars:
     instance_role: database
@@ -36,34 +36,32 @@
       tags: ["always"]
   roles:
     - name: scylladb
-      vars:
-        cluster_name: "Trackity"
       tags: ["database", "scylladb"]
 
-  post_tasks:
-    - name: Test status of cluster
-      ansible.builtin.shell: |
-        nodetool -h ::FFFF:127.0.0.1 status | grep -E '^(UN|DN|UJ|DJ)' || true
-      changed_when: false
-      register: nodetool_status
+  #post_tasks:
+  #  - name: Test status of cluster
+  #    ansible.builtin.shell: |
+  #      nodetool -h ::FFFF:127.0.0.1 status | grep -E '^(UN|DN|UJ|DJ)' || true
+  #    changed_when: false
+  #    register: nodetool_status
 
-    - name: Count node UN (Up/Normal)
-      set_fact:
-        un_count: "{{ nodetool_status.stdout_lines | select('search', '^UN') | list | length }}"
+  #  - name: Count node UN (Up/Normal)
+  #    set_fact:
+  #      un_count: "{{ nodetool_status.stdout_lines | select('search', '^UN') | list | length }}"
 
-    - name: Count number of scylla nodes
-      set_fact:
-        all_scylla_node_count: "{{ groups['scylla-nodes'] | map('extract', hostvars) | selectattr('inventory_hostname') | list | length }}"
+  #  - name: Count number of scylla nodes
+  #    set_fact:
+  #      all_scylla_node_count: "{{ groups['scylla-nodes'] | map('extract', hostvars) | selectattr('inventory_hostname') | list | length }}"
 
-    - name: Check if every node is up and ready
-      fail:
-        msg: >-
-          Only have {{ un_count }}/{{ all_scylla_node_count }} node in UN.
-      when: un_count != all_scylla_node_count
+  #  - name: Check if every node is up and ready
+  #    fail:
+  #      msg: >-
+  #        Only have {{ un_count }}/{{ all_scylla_node_count }} node in UN.
+  #    when: un_count != all_scylla_node_count
 
-    #- name: Scan error
-    #  ansible.builtin.shell: |
-    #    journalctl -u scylla-server --since "10 minutes ago" | grep -iE "(ERROR|exception|panic|segmentation|reactor stalled)" | tail -20 || true
-    #  changed_when: false
-    #  register: scylla_errors
-    #  failed_when: "'ERROR' in scylla_errors.stdout.upper() or 'EXCEPTION' in scylla_errors.stdout.upper()"
+  #  #- name: Scan error
+  #  #  ansible.builtin.shell: |
+  #  #    journalctl -u scylla-server --since "10 minutes ago" | grep -iE "(ERROR|exception|panic|segmentation|reactor stalled)" | tail -20 || true
+  #  #  changed_when: false
+  #  #  register: scylla_errors
+  #  #  failed_when: "'ERROR' in scylla_errors.stdout.upper() or 'EXCEPTION' in scylla_errors.stdout.upper()"

@@ -200,6 +200,15 @@
         - "{{ kafka_config_dir }}"
         - "{{ kafka_ssl_dir }}"
 
+    - name: Render log4j2.yaml
+      template:
+        src: log4j2.yaml.j2
+        dest: "{{ kafka_config_dir }}/log4j2.yaml"
+        owner: kafka
+        group: kafka
+        mode: '0644'
+      notify: Restart kafka
+
     - name: Copy certificate from local to brokers
       block:
         - name: Copy truststore file

@@ -12,6 +12,15 @@
         delay: 10
         timeout: 60
 
+    - name: Wait for Cluster Health to be Green (Zero Downtime Safety)
+      uri:
+        url: "http://localhost:9200/_cluster/health"
+        method: GET
+      register: cluster_health
+      until: cluster_health.json.status == "green"
+      retries: 60
+      delay: 15
+
 - name: Restart nginx
   systemd:
     name: nginx

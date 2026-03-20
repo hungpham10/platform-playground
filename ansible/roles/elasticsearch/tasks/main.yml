@@ -10,6 +10,7 @@
     - "{{ es_log_dir }}"
     - "{{ es_conf_dir }}/certs"
     - "{{ es_conf_dir }}/certs/ca"
+    - "{{ es_conf_dir }}/jvm.options.d"
 
 - name: Try to set permissions, ignore if file is absent
   become: true
@@ -55,16 +56,67 @@
     mode: 0660
   notify: Restart elasticsearch
 
+- name: Create Java security policy for rsyslog
+  copy:
+    dest: /etc/elasticsearch/java.policy
+    content: |
+      grant {
+        permission java.net.SocketPermission "127.0.0.1:514", "connect,resolve";
+      };
+    owner: root
+    group: elasticsearch
+    mode: '0644'
+
+- name: Configure Java security policy in jvm.options
+  lineinfile:
+    path: /etc/elasticsearch/jvm.options
+    regexp: '^-Djava.security.policy='
+    line: '-Djava.security.policy=/etc/elasticsearch/java.policy'
+    state: present
+  notify: Restart elasticsearch
+
+- name: Disable default GC logging in main jvm.options
+  lineinfile:
+    path: /etc/elasticsearch/jvm.options
+    regexp: '^-Xlog:gc'
+    line: '# \g<0>' # Thêm dấu # vào trước các dòng bắt đầu bằng -Xlog:gc
+    backrefs: yes
+  notify: Restart elasticsearch
+
 - name: Disable rotation GC log
   copy:
     dest: /etc/elasticsearch/jvm.options.d/gc-logging.options
     content: |
       ## Disable internal GC log rotation - let external logrotate handle it
-      -Xlog:gc*,gc+age=trace,safepoint:file=/var/log/elasticsearch/gc.log:utctime,pid,tags
+      -Xlog:gc*,gc+age=trace,safepoint:file=/var/log/elasticsearch/gc.log:utctime,pid,tags:filecount=0
     owner: elasticsearch
     group: elasticsearch
     mode: '0664'
   notify: Restart elasticsearch
+
+- name: Create heap configuration in jvm.options.d
+  copy:
+    dest: /etc/elasticsearch/jvm.options.d/heap.options
+    owner: root
+    group: elasticsearch
+    mode: '0660'
+    content: |
+      -Xms{{ es_heap_size }}
+      -Xmx{{ es_heap_size }}
+  notify: Restart elasticsearch
+
+- name: Copy realm files to every nodes
+  copy:
+    src: "realm/{{ item.src }}" # File này nằm trên máy tính bạn đang chạy Ansible
+    dest: "{{ es_conf_dir }}/{{ item.dest }}"
+    owner: elasticsearch
+    group: elasticsearch
+    mode: '0600'
+  loop:
+    - { 'dest': 'roles.yml', 'src': "{{ es_file_realm.roles }}" }
+    - { 'dest': 'users', 'src': "{{ es_file_realm.users }}" }
+    - { 'dest': 'users_roles', 'src': "{{ es_file_realm.users_roles }}" }
+  when: es_file_realm is defined
 
 - name: Generate certificates on first master node
   become: true
@@ -81,6 +133,7 @@
         creates: "{{ es_conf_dir }}/certs/ca.zip"
       register: ca_result
       failed_when: ca_result.rc != 0 and "already exists" not in ca_result.stderr
+      when: es_cluster_certificate is undefined
 
     - name: Try to set correct permissions for CA file
       file:
@@ -90,6 +143,7 @@
         state: file
         path: "{{ es_conf_dir }}/certs/ca.zip"
       become: true
+      when: es_cluster_certificate is undefined
 
     - name: Unzip CA files on master
       unarchive:
@@ -99,6 +153,19 @@
         owner: elasticsearch
         group: elasticsearch
         mode: 0644
+      when: es_cluster_certificate is undefined
+
+    - name: Copy CA files on master
+      copy:
+        src: "ssl/{{ item.src }}" # File này nằm trên máy tính bạn đang chạy Ansible
+        dest: "{{ es_conf_dir }}/certs/ca/{{ item.dest }}"
+        owner: elasticsearch
+        group: elasticsearch
+        mode: '0600'
+      loop:
+        - { 'dest': 'ca.crt', 'src': "{{ es_cluster_certificate.ca_crt }}" }
+        - { 'dest': 'ca.key', 'src': "{{ es_cluster_certificate.ca_key }}" }
+      when: es_cluster_certificate is defined
 
     - name: Ensure elasticsearch user owns the ca directory and files on es-1
       file:
@@ -170,9 +237,9 @@
 
   when: inventory_hostname == groups['elasticsearch-nodes'][0]
 
-- name: Synchronize CA and node certificates from first master to all nodes using elasticsearch user
+- name: Synchronize CA and node certificates from first node to all nodes using elasticsearch user
   command:
-    cmd: "rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' elasticsearch@{{ groups['elasticsearch-master'][0] }}:{{ es_conf_dir }}/certs/{{ item.src }} {{ es_conf_dir }}/certs/{{ item.dest }}"
+    cmd: "rsync -avz -e 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null' elasticsearch@{{ groups['elasticsearch-nodes'][0] }}:{{ es_conf_dir }}/certs/{{ item.src }} {{ es_conf_dir }}/certs/{{ item.dest }}"
     creates: "{{ es_conf_dir }}/certs/{{ item.dest }}"
   become: true
   become_user: elasticsearch
@@ -183,7 +250,7 @@
       dest: "{{ inventory_hostname }}.crt"
     - src: "{{ inventory_hostname }}/{{ inventory_hostname }}.key"
       dest: "{{ inventory_hostname }}.key"
-  when: inventory_hostname != groups['elasticsearch-master'][0]
+  when: inventory_hostname != groups['elasticsearch-nodes'][0]
 
 - name: Try to set correct permissions for certificates file
   file:
@@ -212,6 +279,11 @@
     delay: 10
     timeout: 60
     
+- name: Get Elasticsearch version
+  shell: /usr/share/elasticsearch/bin/elasticsearch --version | cut -d',' -f1 | grep -oE '[0-9]+\.[0-9]+'
+  register: es_ver_check
+  changed_when: false
+
 - name: Setup account
   block:
     - name: Random first password
@@ -278,7 +350,10 @@
         validate_certs: no
       register: users_check
       when: es_admin_pass != "" and (es_users | length > 0)
-  when: inventory_hostname == groups['elasticsearch-master'][0]
+  when:
+    - groups.get('elasticsearch-master', []) | length > 0
+    - inventory_hostname == groups['elasticsearch-master'][0]
+    - es_ver_check.stdout is version('8.0', '>=')
 
 - name: Render config www in nginx for Elasticsearch
   template:

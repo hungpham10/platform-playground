@@ -67,22 +67,38 @@
     - firewall_rules.tcp_ports is defined
     - item.1.scope | default('public') == 'internal'
 
-- name: Apply custom firewall rules (rich rules)
+- name: Apply custom rich rules
   firewalld:
     zone: public
     rich_rule: "{{ item.rich_rule }}"
     permanent: yes
     state: enabled
-  loop: "{{ firewall_rules.custom | default([]) }}"
-  when:
+    immediate: yes
+  loop: "{{ firewall_rules.custom | selectattr('rich_rule', 'defined') | list }}"
+  when: 
     - firewall_enabled
     - firewall_rules.custom is defined
 
 - name: Configure firewall logging
   command: firewall-cmd --set-log-denied="{{ 'all' if firewall_log_dropped_packets | default(false) | bool else 'off' }}"
-  when: firewall_enabled
   register: log_denied_result
+  when: firewall_enabled
   changed_when: log_denied_result.rc == 0
+
+- name: Configure Direct Rules (Load Balancing)
+  ansible.builtin.template:
+    src: direct.xml.j2
+    dest: /etc/firewalld/direct.xml
+    owner: root
+    group: root
+    mode: '0644'
+  register: direct_config
+  vars:
+    direct_items: "{{ firewall_rules.custom | selectattr('direct_rule', 'defined') | map(attribute='direct_rule') | list }}"
+  when: 
+    - firewall_enabled
+    - firewall_rules.custom is defined
+    - direct_items | length > 0
 
 - name: Reload firewalld to apply all changes
   command: firewall-cmd --reload

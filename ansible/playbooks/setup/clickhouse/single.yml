@@ -1,0 +1,95 @@
+---
+- import_playbook: ../../boilerplate.yml
+
+- name: Configure Clickhouse Database Servers
+  hosts: all
+  become: true
+  vars:
+    instance_role: database
+    subdomain_instance_role: clickhouse
+
+  pre_tasks:
+    - name: Include role specific variables
+      include_vars:
+        dir: "{{ item }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      loop:
+        - "../../../group_vars/all"
+        - "../../../group_vars/database"
+      tags: ["always"]
+
+    - name: Check if host_vars directory exists
+      ansible.builtin.stat:
+        path: "../../../host_vars/{{ inventory_hostname }}"
+      register: host_vars_dir
+      tags: ["always"]
+
+    - name: Include host specific variables
+      include_vars:
+        dir: "../../../host_vars/{{ inventory_hostname }}"
+        ignore_unknown_extensions: true
+        extensions: ['yml', 'yaml']
+      when: host_vars_dir.stat.exists
+      tags: ["always"]
+
+  roles:
+    # Setup storage
+    - role: storage
+      tags: ["storage"]
+
+    # Setup clickhouse service
+    - role: clickhouse
+      tags: ["database"]
+
+    # Setup clickhouse logging
+    - role: logrotate
+      vars:
+        logrotate_custom_entries:
+          - name: clickhouse-normal-log
+            path: "/var/log/clickhouse-server/clickhouse-server.log"
+            frequency: daily
+            options:
+              - daily
+              - rotate 7
+              - compress
+              - delaycompress
+              - missingok
+              - notifempty
+              - su clickhouse clickhouse
+            create: "0640 clickhouse clickhouse"
+      tags: ["monitoring"]
+
+  post_tasks:
+    - name: Check ClickHouse service is running
+      ansible.builtin.systemd:
+        name: clickhouse-server
+        state: started
+      register: service_status
+      failed_when: service_status.status.ActiveState != "active"
+
+    - name: Verify default user can connect from localhost (no_password + localhost only)
+      ansible.builtin.command: clickhouse-client --user default --query "SELECT 1"
+      register: local_connect
+      changed_when: false
+      failed_when: local_connect.rc != 0
+
+    - name: Debug local connect output
+      ansible.builtin.debug:
+        var: local_connect.stdout
+
+    - name: Try connect with explicit host 127.0.0.1
+      ansible.builtin.command: clickhouse-client --host 127.0.0.1 --user default --query "SELECT 1"
+      register: localhost_explicit
+      changed_when: false
+      failed_when: localhost_explicit.rc != 0
+
+    - name: Check log which not related to default user
+      ansible.builtin.command: journalctl -u clickhouse-server -n 200 --no-pager
+      register: logs
+      changed_when: false
+
+    - name: Assert no BAD_ARGUMENTS or password error in logs
+      ansible.builtin.assert:
+        that: "'BAD_ARGUMENTS' not in logs.stdout and 'password' not in logs.stdout.lower()"
+        fail_msg: "Có lỗi BAD_ARGUMENTS hoặc password trong log ClickHouse!"

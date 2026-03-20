@@ -22,13 +22,9 @@
   ansible.builtin.set_fact:
     is_running_in_gce: "{{ gce_metadata_check.status == 200 and 'projects/' in gce_metadata_check.content }}"
 
-- name: Initialize scylladb_seeds list
-  set_fact:
-    scylladb_seeds: []
-
 - name: Build scylladb_seeds list from Ansible group
   set_fact:
-    scylladb_seeds: "{{ scylladb_seeds + [ (hostvars[item]['full_hostname'] | default(hostvars[item]['ansible_host'])) ] }}"
+    scylladb_seeds: "{{ (scylladb_seeds | default([])) + [ (hostvars[item]['full_hostname'] | default(hostvars[item]['ansible_host'])) ] }}"
   loop: "{{ groups['scylla-nodes'] | default([]) }}"
 
 - name: Create Scylla directories
@@ -95,6 +91,14 @@
     src: cassandra-rackdc.properties.j2
     dest: "{{ scylla_conf }}/cassandra-rackdc.properties"
   notify: Restart ScyllaDB
+
+- name: Estimate CPU to setup scylla threads
+  command: scylla_io_setup
+  when: not file_check_result.stat.exists 
+  register: cpu_setup_result
+  failed_when: cpu_setup_result.rc != 0
+  changed_when: cpu_setup_result.rc == 0
+  timeout: 600
 
 - name: Estimate IO to setup scylla disks
   command: scylla_io_setup

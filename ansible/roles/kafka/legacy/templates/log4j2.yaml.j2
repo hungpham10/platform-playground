@@ -1,0 +1,88 @@
+
+Configuration:
+  Properties:
+    Property:
+      - name: "kafka.logs.dir"
+        value: "."
+      - name: "logPattern"
+        value: "[%d] %p %m (%c)%n"
+
+  Appenders:
+    Console:
+      name: STDOUT
+      PatternLayout:
+        pattern: "${logPattern}"
+
+    # Chuyển tất cả sang File Appender để logrotate quản lý
+    File:
+      - name: KafkaAppender
+        fileName: "${sys:kafka.logs.dir}/server.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+      
+      - name: StateChangeAppender
+        fileName: "${sys:kafka.logs.dir}/state-change.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+
+      - name: RequestAppender
+        fileName: "${sys:kafka.logs.dir}/kafka-request.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+
+      - name: CleanerAppender
+        fileName: "${sys:kafka.logs.dir}/log-cleaner.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+
+      - name: ControllerAppender
+        fileName: "${sys:kafka.logs.dir}/controller.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+
+      - name: AuthorizerAppender
+        fileName: "${sys:kafka.logs.dir}/kafka-authorizer.log"
+        PatternLayout:
+          pattern: "${logPattern}"
+
+  Loggers:
+    Root:
+      level: INFO
+      AppenderRef:
+        - ref: STDOUT
+        - ref: KafkaAppender
+    Logger:
+      - name: kafka
+        level: INFO
+      - name: org.apache.kafka
+        level: INFO
+      - name: kafka.request.logger
+        level: WARN
+        additivity: false
+        AppenderRef:
+          ref: RequestAppender
+      - name: kafka.network.RequestChannel$
+        level: WARN
+        additivity: false
+        AppenderRef:
+          ref: RequestAppender
+      - name: org.apache.kafka.controller
+        level: INFO
+        additivity: false
+        AppenderRef:
+          ref: ControllerAppender
+      - name: kafka.log.LogCleaner
+        level: INFO
+        additivity: false
+        AppenderRef:
+          ref: CleanerAppender
+      - name: state.change.logger
+        level: INFO
+        additivity: false
+        AppenderRef:
+          ref: StateChangeAppender
+      - name: kafka.authorizer.logger
+        level: INFO
+        additivity: false
+        AppenderRef:
+          ref: AuthorizerAppender

@@ -9,14 +9,41 @@
   loop: "{{ storage_devices + storage_lvs }}"
   when: item.state | default('present') == 'present'
 
-- name: Mount filesystems
-  mount:
+- name: Get filesystem UUID for each partition
+  ansible.builtin.command: blkid -s UUID -o value {{ item.device }}1
+  register: uuid_result
+  changed_when: false
+  loop: "{{ storage_devices }}"
+  when:
+    - item.state | default('present') == 'present'
+    - item.device is defined
+
+# 2. Mount và cập nhật fstab bằng UUID thực tế
+- name: Mount partitioned devices with UUID in /etc/fstab
+  ansible.posix.mount:
+    path: "{{ item.item.mount_point }}"
+    src: "UUID={{ uuid_result.results[loop_index].stdout }}"
+    fstype: "{{ item.item.fstype }}"
+    opts: "{{ item.item.opts | default('defaults') }}"
+    dump: "{{ item.item.dump | default('0') }}"
+    passno: "{{ item.item.passno | default('2') }}"
+    state: mounted
+  loop: "{{ uuid_result.results }}"
+  loop_control:
+    index_var: loop_index
+  when:
+    - item.item.state | default('present') == 'present'
+    - item.item.device is defined
+    - item.stdout | length > 0   # Đảm bảo có UUID
+
+- name: Mount LVM logical volumes
+  ansible.posix.mount:
     path: "{{ item.mount_point }}"
-    src: "{{ item.device if 'device' in item else '/dev/' + item.vg + '/' + item.name }}"
+    src: "/dev/{{ item.vg }}/{{ item.name }}"
     fstype: "{{ item.fstype }}"
-    opts: "{{ item.opts | default('defaults,noatime') if item.fstype == 'btrfs' else item.opts | default('defaults') }}"
+    opts: "{{ item.opts | default('defaults') }}"
     dump: "{{ item.dump | default('0') }}"
     passno: "{{ item.passno | default('2') }}"
     state: mounted
-  loop: "{{ storage_devices + storage_lvs }}"
+  loop: "{{ storage_lvs }}"
   when: item.state | default('present') == 'present'

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<direct>
+  {% for rule in direct_items %}
+  <rule priority="{{ rule.priority | default(0) }}" table="{{ rule.table | default('nat') }}" ipv="ipv4" chain="{{ rule.chain | default('PREROUTING') }}">
+    {{ rule.args }}
+  </rule>
+  {% endfor %}
+</direct>

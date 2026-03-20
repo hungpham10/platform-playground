@@ -3,13 +3,23 @@ zookeeper_home: "/opt/zookeeper"
 zookeeper_install_dir: "/opt/zookeeper"
 zookeeper_data_dir: "/var/lib/zookeeper"
 
-kafka_minor: "2.8.2"
+kafka_minor: "2.8.1"
 kafka_major: "2.13"
 kafka_home: "/opt/kafka"
 kafka_install_dir: "/opt/kafka"
 kafka_data_dir: "/var/lib/kafka"
 kafka_ssl_dir: "{{ kafka_install_dir }}/ssl"
 kafka_config_dir: "{{ kafka_install_dir }}/config"
+
+# Cấu hình Kafka
+kafka_node_id: "{{ groups['kafka_nodes'].index(inventory_hostname) + 1 }}"
+kafka_listeners:
+  broker: "BROKER://0.0.0.0:9092"
+kafka_inter_broker_listener_name: "BROKER"
+kafka_advertised_listeners: "BROKER://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092"
+
+# Mapping streams
+kafka_listener_security_protocol_map: "BROKER:PLAINTEXT"
 
 # Cấu hình topic
 kafka_num_partitions: 3

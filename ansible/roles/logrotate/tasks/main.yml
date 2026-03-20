@@ -33,6 +33,7 @@
   template:
     src: rsyslog.conf.j2
     dest: "/etc/rsyslog.conf"
+  notify: Restart rsyslog
 
 - name: Generate logrotate.d files
   template:

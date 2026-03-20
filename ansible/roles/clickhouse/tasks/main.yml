@@ -1,0 +1,78 @@
+- name: Create clickhouse directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: clickhouse
+    group: clickhouse
+    mode: '0755'
+  loop:
+    - "{{ clickhouse_log_dir }}"
+    - "{{ clickhouse_data_dir }}"
+    - "{{ clickhouse_data_dir }}/tmp"
+    - "{{ clickhouse_data_dir }}/access"
+
+- name: Calculate total memory
+  set_fact:
+    # Tổng RAM tính bằng GB (làm tròn xuống 1 chữ số thập phân)
+    total_ram_gb: "{{ (ansible_memtotal_mb | int / 1024) | round(1) }}"
+
+- name: Choose clickhouse memory ratio
+  set_fact:
+    # Tỷ lệ % RAM dùng cho ClickHouse (per-query max_memory_usage)
+    # - >= 64GB: 80% (rất an toàn cho production)
+    # - 32-64GB: 75%
+    # - 16-32GB: 70%
+    # - <16GB: 60% + cảnh báo
+    clickhouse_memory_ratio: >-
+      {% if ansible_memtotal_mb | int >= 65536 %}
+        0.80
+      {% elif ansible_memtotal_mb | int >= 32768 %}
+        0.75
+      {% elif ansible_memtotal_mb | int >= 16384 %}
+        0.70
+      {% else %}
+        0.60
+      {% endif %}
+
+- name: Convert to Gigabyte
+  set_fact:
+    # Giá trị GB để dễ đọc/debug (làm tròn xuống số nguyên hoặc 1 chữ số thập phân)
+    clickhouse_max_memory_gb: "{{ (total_ram_gb | float * clickhouse_memory_ratio | float) | round(1) }}"
+
+- name: Export to correct memory that we will use
+  set_fact:
+    # Optional: Giới hạn cho user default (thường 80% của server limit)
+    clickhouse_default_user_max_memory_gb: "{{ (clickhouse_max_memory_gb * 0.8) | int }}"
+
+- name: Render config.d/clickhouse.xml
+  template:
+    src: clickhouse.xml.j2
+    dest: "{{ clickhouse_conf_dir }}/config.d/clickhouse.xml"
+    owner: clickhouse
+    group: clickhouse
+    mode: 0660
+  notify: Restart clickhouse
+
+- name: Render users.d/system.xml
+  template:
+    src: system.xml.j2
+    dest: "{{ clickhouse_conf_dir }}/users.d/system.xml"
+    owner: clickhouse
+    group: clickhouse
+    mode: 0660
+  notify: Restart clickhouse
+#
+#- name: Render users.d/users.xml
+#  template:
+#    src: users.xml.j2
+#    dest: "{{ clickhouse_conf_dir }}/users.d/users.xml"
+#    owner: clickhouse
+#    group: clickhouse
+#    mode: 0660
+#  notify: Restart clickhouse
+
+- name: Enable and start ClickHouse
+  systemd:
+    name: clickhouse-server
+    enabled: yes
+    state: started

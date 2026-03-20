@@ -1,6 +1,6 @@
-es_version: 8.2.3
-es_heap_size: 1g
-es_cluster_name: "elasticsearch"
+#es_version: 7.17.22
+#es_heap_size: 13g
+#es_cluster_name: "logging-es"
 
 es_default_users:
   - username: admin
@@ -21,22 +21,35 @@ es_default_roles:
     metadata:
       description: "Custom admin role with full access"
 
+es_cluster_certificate:
+  ca_crt: "ca.crt"
+  ca_key: "ca.key"
+
+es_file_realm:
+  roles: "roles.yml"
+  users: "users"
+  users_roles: "users_roles"
+
 es_config:
   cluster.name: "{{ es_cluster_name }}"
   node.roles: "{{ roles_list }}"
   network.host: 0.0.0.0
   http.port: 9200
+  #node:
+  #  attr:
+  #    k8s_node_name: "{{ inventory_hostname }}"
   discovery.seed_hosts: "{{ 
-    (groups['elasticsearch-nodes'] + groups['elasticsearch-master']) 
+    groups['elasticsearch-nodes']
     | unique 
     | map('extract', hostvars) 
-    | map(attribute='inventory_hostname') 
+    | map(attribute='ansible_host') 
     | unique 
     | list 
+    | union(es_external_seed_hosts | default([]))
   }}" 
   cluster.initial_master_nodes: "{{ 
     groups['elasticsearch-master'] 
     | map('extract', hostvars) 
-    | map(attribute='inventory_hostname') 
+    | map(attribute='ansible_host') 
     | list 
   }}"

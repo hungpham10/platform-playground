@@ -3,21 +3,21 @@ kafka_minor: "4.0.0"
 kafka_major: "2.13"
 kafka_url: "https://downloads.apache.org/kafka/{{ kafka_minor }}/kafka_{{ kafka_major }}-{{ kafka_minor }}.tgz"
 node_id: "{{ groups['kafka_nodes'].index(inventory_hostname) + 1 }}"
-install_dir: "/opt/kafka"
-data_dir: "/data/kafka"
-config_dir: "{{ install_dir }}/config/kraft"
+kafka_install_dir: "/opt/kafka"
+kafka_data_dir: "/data/kafka"
+kafka_config_dir: "{{ kafka_install_dir }}/config"
 
 # Cấu hình KRaft
 kafka_node_id: "{{ groups['kafka_nodes'].index(inventory_hostname) + 1 }}"
 kafka_listeners:
   controller: "CONTROLLER://0.0.0.0:9093"
-  broker: "EXTERNAL://0.0.0.0:9092"
-kafka_inter_broker_listener_name: "INTERNAL"
+  broker: "BROKER://0.0.0.0:9092"
+kafka_inter_broker_listener_name: "BROKER"
 kafka_controller_listener_names: "CONTROLLER"
-kafka_advertised_listeners: "EXTERNAL://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092,INTERNAL://{{ full_hostname | default(ansible_default_ipv4.address) }}:9094"
+kafka_advertised_listeners: "BROKER://{{ full_hostname | default(ansible_default_ipv4.address) }}:9092"
 
 # Mapping streams
-kafka_listener_security_protocol_map: "EXTERNAL:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT"
+kafka_listener_security_protocol_map: "BROKER:PLAINTEXT,CONTROLLER:PLAINTEXT"
 
 # Cấu hình ACL và SASL
 kafka_acl_allow_everyone_if_no_acl: false
@@ -30,10 +30,10 @@ kafka_acl_allow_everyone_if_no_acl: false
 #kafka_application: []
 
 # Cấu hình topic
-kafka_num_partitions: 3
-kafka_default_replication_factor: 3
-kafka_offsets_topic_replication_factor: 3
-kafka_transaction_state_log_replication_factor: 3
+kafka_num_partitions: 2
+kafka_default_replication_factor: 2
+kafka_offsets_topic_replication_factor: 2
+kafka_transaction_state_log_replication_factor: 2
 kafka_transaction_state_log_min_isr: 2
 
 # Tối ưu hóa hiệu năng

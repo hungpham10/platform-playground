@@ -39,9 +39,17 @@
 
     - name: Define node roles based on group membership
       set_fact:
-        roles_list: "{{ ([] | 
-                       union(['master'] if inventory_hostname in groups['elasticsearch-master'] else []) | 
-                       union(['data'] if inventory_hostname in groups['elasticsearch-data'] else [])) }}"
+        roles_list: >-
+          {{
+            ([] | 
+            union(['master'] if inventory_hostname in (groups.get('elasticsearch-master', [])) else []) | 
+            union(['data'] if inventory_hostname in (groups.get('elasticsearch-data', [])) else []) |
+            union(['data_content'] if inventory_hostname in (groups.get('elasticsearch-data-content', [])) else []) |
+            union(['data_hot'] if inventory_hostname in (groups.get('elasticsearch-data-hot', [])) else []) |
+            union(['data_warm'] if inventory_hostname in (groups.get('elasticsearch-data-warm', [])) else []) |
+            union(['data_cold'] if inventory_hostname in (groups.get('elasticsearch-data-cold', [])) else []))
+          }}
+      when: roles_list is undefined
 
     - name: Define elastic accounts
       set_fact:
@@ -66,16 +74,21 @@
       vars:
         logrotate_custom_entries:
           - name: elasticsearch-log
-            path: "/var/log/elasticsearch/gc.log.*"
+            path: "/var/log/elasticsearch/gc.log"
             frequency: daily
             options:
-              - daily
               - rotate 10
               - compress
+              - copytruncate
               - delaycompress
               - missingok
               - notifempty
             create: "0640 elasticsearch elasticsearch"
+      tags: ["monitoring"]
+
+    - role: exporters/elasticsearch
+      vars:
+        es_uri: "https://{{ ansible_host }}:9200"
       tags: ["monitoring"]
   post_tasks:
     - name: Test kết nối và info cluster

@@ -1,0 +1,26 @@
+<clickhouse>
+  <!-- Paths -->
+  <path>{{ clickhouse_data_dir }}/</path>
+  <tmp_path>{{ clickhouse_data_dir }}/tmp/</tmp_path>
+  <log>/var/log/clickhouse/clickhouse-server.log</log>
+
+  <!-- Network -->
+  <http_port>{{ clickhouse_http_port }}</http_port>
+{% if clickhouse_certificate is defined %}
+  <https_port>{{ clickhouse_https_port }}</https_port>
+{% endif %}
+  <tcp_port>{{ clickhouse_tcp_port }}</tcp_port>
+  <listen_host>{{ clickhouse_listen_host }}</listen_host>
+  <listen_try_ipv6>false</listen_try_ipv6>
+
+  <!-- Memory & Concurrency -->
+  <max_concurrent_queries>{{ clickhouse_max_concurrent_queries }}</max_concurrent_queries>
+
+  <!-- MergeTree defaults -->
+  <merge_tree>
+    <parts_to_throw_insert>300</parts_to_throw_insert>
+    <parts_to_delay_insert>150</parts_to_delay_insert>
+    <max_bytes_to_merge_at_max_space_in_pool>2000000000</max_bytes_to_merge_at_max_space_in_pool> 
+    <max_replicated_merges_in_queue>16</max_replicated_merges_in_queue>
+  </merge_tree>
+</clickhouse>

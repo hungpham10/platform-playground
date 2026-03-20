@@ -1,4 +1,7 @@
 ---
+- debug:
+    msg: "{{ storage_vgs }}"
+
 - name: Create volume groups
   lvg:
     vg: "{{ item.name }}"

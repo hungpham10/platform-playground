@@ -24,6 +24,18 @@ xpack.security:
     certificate: {{ es_conf_dir }}/certs/{{ inventory_hostname }}.crt
     certificate_authorities: ["{{ es_conf_dir }}/certs/ca/ca.crt"]
 
+{% if es_file_realm is defined %}
+  authc:
+    realms:
+      file:
+        file1:
+          order: -100
+      native:
+        native1:
+          order: -99
+    reserved_realm.enabled: "false"
+{% endif %}
+
 path:
   data: {{ es_data_dir }}
   logs: {{ es_log_dir }}

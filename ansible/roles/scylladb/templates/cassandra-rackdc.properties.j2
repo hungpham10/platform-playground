@@ -1,6 +1,6 @@
 
 # All nodes in the same DC
-dc={{ cluster_name }}
+dc={{ data_center | default(cluster_name) }}
 
 # Put nodes in different racks for better fault tolerance
 rack=rack-{{ scylla_node_id }}

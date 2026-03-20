@@ -1,0 +1,9 @@
+---
+es_exporter_version: "1.7.0"
+es_exporter_port: 9114
+
+# Địa chỉ node Elasticsearch mà exporter sẽ lấy dữ liệu
+es_uri: "https://localhost:9200"
+
+es_exporter_download_url: "https://github.com/prometheus-community/elasticsearch_exporter/releases/download/v{{ es_exporter_version }}/elasticsearch_exporter-{{ es_exporter_version }}.linux-amd64.tar.gz"
+es_exporter_skip_ssl: true
