@@ -3,19 +3,8 @@
   assert:
     that:
       - ansible_memtotal_mb >= (postgres_memory_requirement | default(4096))
-    fail_msg: >
-      Host does not meet PostgreSQL memory requirement:
-      Required={{ postgres_memory_requirement | default(4096) }}MB,
-      Found={{ ansible_memtotal_mb }}MB
-
-- name: Verify CPU requirements
-  assert:
-    that:
       - ansible_processor_vcpus >= (postgres_cpu_requirement | default(2))
-    fail_msg: >
-      Host does not meet PostgreSQL CPU requirement:
-      Required={{ postgres_cpu_requirement | default(2) }} vCPUs,
-      Found={{ ansible_processor_vcpus }} vCPUs
+    fail_msg: "Host does not meet PostgreSQL requirements."
 
 - name: Create PostgreSQL directories
   file:
@@ -31,7 +20,7 @@
     - "{{ postgres_backup_dir }}"
     - "{{ postgres_archive_dir }}"
 
-- name: Configure PostgreSQL
+- name: Configure PostgreSQL basics
   template:
     src: "{{ item.src }}"
     dest: "{{ item.dest }}"
@@ -41,13 +30,6 @@
   loop:
     - { src: postgresql.conf.j2, dest: "{{ postgres_config_path }}/postgresql.conf" }
     - { src: pg_hba.conf.j2, dest: "{{ postgres_config_path }}/pg_hba.conf" }
-  notify: restart postgresql
-
-- name: Makesure that WAL level must support when setup cluster 
-  assert:
-    that:
-      - postgres_wal_level in ['replica', 'logical']
-  when: postgres_replication_role in ['postgres-master', 'postgres-standby']
   notify: restart postgresql
 
 - name: Configure PostgreSQL replication
@@ -60,14 +42,206 @@
   when: postgres_replication_role in ['postgres-master', 'postgres-standby']
   notify: restart postgresql
 
-- name: Create standby.signal file
-  file:
-    path: "{{ postgres_data_dir }}/standby.signal"
-    state: touch
+- name: Start and enable PostgreSQL
+  systemd:
+    name: "{{ postgres_service }}"
+    state: started
+    enabled: yes
+    daemon_reload: yes
+
+- name: Flush handlers to ensure PG is up
+  meta: flush_handlers
+
+- name: Create .pgpass file for postgres user
+  copy:
+    content: "*:*:*:{{ postgres_replication.user }}:{{ postgres_replication.password }}"
+    dest: /var/lib/postgresql/.pgpass
+    owner: postgres
+    group: postgres
+    mode: '0600'
+
+
+- name: Create replication users on master
+  postgresql_user:
+    name: "{{ item.name }}"
+    password: "{{ item.password }}"
+    role_attr_flags: "{{ item.flags }}"
+    state: present
+  loop:
+    - { name: "{{ postgres_replication.user }}", password: "{{ postgres_replication.password }}", flags: "REPLICATION,LOGIN" }
+    - { name: "{{ postgres_replication_manager.user }}", password: "{{ postgres_replication_manager.password }}", flags: "SUPERUSER,REPLICATION,LOGIN" }
+  when: postgres_replication_role == 'postgres-master'
+  become: true
+  become_user: postgres
+
+- name: Create repmgr database on master
+  postgresql_db:
+    name: "repmgr"
+    owner: "{{ postgres_replication_manager.user }}"
+  when: 
+    - postgres_replication_role == 'postgres-master'
+    - postgres_replication_manager.enabled
+  become: true
+  become_user: postgres
+
+- name: Configure repmgr.conf
+  template:
+    src: repmgr.conf.j2
+    dest: "/etc/repmgr.conf"
     owner: postgres
     group: postgres
     mode: '0644'
+  when: postgres_replication_manager.enabled
+
+- name: Register Primary node (Master)
+  command: /usr/bin/repmgr -f /etc/repmgr.conf primary register --force
+  become: true
+  become_user: postgres
+  when:
+    - postgres_replication_role == 'postgres-master'
+    - postgres_replication_manager.enabled
+  register: reg_master
+  failed_when: 
+    - reg_master.rc != 0 
+    - "'already registered' not in reg_master.stderr"
+
+# --- PHẦN CLONE DATA CHO STANDBY ---
+- name: Check if data exists on standby
+  stat:
+    path: "{{ postgres_data_dir }}/PG_VERSION"
+  register: pg_data_check
   when: postgres_replication_role == 'postgres-standby'
+
+- name: Clone standby (using repmgr or pg_basebackup)
+  block:
+    - name: Stop PostgreSQL before cloning
+      systemd:
+        name: "{{ postgres_service }}"
+        state: stopped
+
+    - name: Remove existing data for clean clone
+      file:
+        path: "{{ postgres_data_dir }}"
+        state: absent
+
+    - name: Create PostgreSQL directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: postgres
+        group: postgres
+        mode: '0700'
+      loop:
+        - "{{ postgres_config_path }}"
+        - "{{ postgres_config_path }}/conf.d"
+        - "{{ postgres_data_dir }}"
+        - "{{ postgres_backup_dir }}"
+        - "{{ postgres_archive_dir }}"
+
+    - name: Create .pgpass file for postgres user
+      copy:
+        content: |
+          *:*:*:{{ postgres_replication.user }}:{{ postgres_replication.password }}
+          *:*:*:{{ postgres_replication_manager.user }}:{{ postgres_replication_manager.password }}
+        dest: /var/lib/postgresql/.pgpass
+        owner: postgres
+        group: postgres
+        mode: '0600'
+      become: true
+
+    - name: Clone using repmgr
+      command: >
+        /usr/bin/repmgr -h {{ hostvars[groups['postgres-master'][0]]['ansible_host'] }} 
+          -U {{ postgres_replication_manager.user }} -d repmgr 
+          -f /etc/repmgr.conf standby clone --force
+      become_user: postgres
+      when: postgres_replication_manager.enabled
+
+    - name: Clone using pg_basebackup (Standard Replica)
+      command: >
+        pg_basebackup -h {{ hostvars[groups['postgres-master'][0]]['ansible_host'] }} 
+        -D {{ postgres_data_dir }} -U {{ postgres_replication.user }} -vP -R
+      become_user: postgres
+      when: not postgres_replication_manager.enabled
+
+    - name: Start PostgreSQL after cloning
+      systemd:
+        name: "{{ postgres_service }}"
+        state: started
+  when:
+    - postgres_replication_role == 'postgres-standby'
+    - not pg_data_check.stat.exists or (postgres_replication_force | default(true))
+
+- name: Register Standby node with repmgr
+  command: /usr/bin/repmgr -f /etc/repmgr.conf standby register --force
+  become: true
+  become_user: postgres
+  when: 
+    - postgres_replication_role == 'postgres-standby'
+    - postgres_replication_manager.enabled
+  register: reg_standby
+  until: reg_standby is success
+  retries: 5
+  delay: 10
+
+- name: Create systemd override directory for repmgrd
+  file:
+    path: /etc/systemd/system/repmgrd.service.d
+    state: directory
+    mode: '0755'
+  become: true
+
+- name: Deploy repmgrd override configuration (native execution under postgres)
+  copy:
+    dest: /etc/systemd/system/repmgrd.service.d/override.conf
+    content: |
+      [Unit]
+      Description=Repmgr replication manager daemon
+      Documentation=https://www.repmgr.org/
+      After=network.target postgresql.service postgresql@{{ postgres_version }}-main.service
+      Wants=postgresql.service
+
+      [Service]
+      User=postgres
+      Group=postgres
+      Type=forking
+      ExecStart=
+      ExecStart=/usr/bin/repmgrd -f /etc/repmgr.conf -d --pid-file=/tmp/repmgrd.pid
+      PIDFile=/tmp/repmgrd.pid
+      ExecStop=/bin/kill $MAINPID
+      Restart=on-failure
+      RestartSec=10
+      TimeoutStartSec=120
+      TimeoutStopSec=30
+
+      StandardOutput=journal
+      StandardError=journal
+
+      [Install]
+      WantedBy=multi-user.target
+    mode: '0644'
+  become: true
+  notify:
+    - daemon reload
+    - restart repmgrd
+
+- name: Force stop repmgrd
+  systemd:
+    name: repmgrd
+    state: stopped
+    enabled: yes
+  when: postgres_replication_manager.enabled
+
+- name: Reload daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Start again repmgrd
+  systemd:
+    name: repmgrd
+    state: started
+    enabled: yes
+  when: postgres_replication_manager.enabled
 
 - name: Create failover management scripts
   template:
@@ -80,151 +254,58 @@
     - { src: promote-to-master.sh.j2, dest: promote-to-master.sh }
     - { src: demote-to-standby.sh.j2, dest: demote-to-standby.sh }
     - { src: check-replication.sh.j2, dest: check-replication.sh }
-  when: postgres_replication_role in ['postgres-master', 'postgres-standby']
+  when: 
+    - postgres_replication_role in ['postgres-master', 'postgres-standby']
+    - postgres_replication_manager.enabled == false
 
-- name: Start and enable PostgreSQL
-  systemd:
-    name: "{{ postgres_service }}@{{ postgres_version }}-main"
-    state: started
-    enabled: yes
-    daemon_reload: yes
+- name: Check current repmgr cluster status
+  command: /usr/bin/repmgr -f /etc/repmgr.conf cluster show
+  become: true
+  become_user: postgres
+  register: cluster_show
+  changed_when: false
+  when: postgres_replication_manager.enabled
+
+- name: Detect current primary node from repmgr
+  set_fact:
+    # 1. Tìm kiếm bằng regex
+    # 2. Nếu không thấy (None), trả về danh sách rỗng []
+    # 3. Lấy phần tử đầu tiên hoặc giá trị 'unknown' nếu rỗng
+    current_primary: "{{ (cluster_show.stdout | regex_findall('primary\\s+\\|\\s+running\\s+\\|\\s+([^\\s|]+)') | first) | default('unknown') }}"
+  when: 
+    - postgres_replication_manager.enabled
+    - cluster_show.stdout is defined
+
+- name: Perform switchover if master is not on the designated node
+  block:
+    - name: Notify about switchover
+      debug:
+        msg: "Node {{ inventory_hostname }} is designated as Master but {{ current_primary }} is currently Primary. Performing switchover..."
+
+    - name: Execute repmgr standby switchover
+      command: /usr/bin/repmgr -f /etc/repmgr.conf standby switchover
+      become: true
+      become_user: postgres
+      register: switchover_result
+      failed_when: 
+        - switchover_result.rc != 0 
+        - "'is the primary' not in switchover_result.stderr"
+      when: ansible_host != current_primary
+  when:
+    - postgres_replication_manager.enabled
+    - postgres_replication_role == 'postgres-master'
+    - current_primary is defined
+    - ansible_host != current_primary
+
+- name: Wait for cluster to stabilize after potential switchover
+  pause:
+    seconds: 10
+  when: 
+    - postgres_replication_manager.enabled
+    - postgres_replication_role == 'postgres-master'
 
 - name: Configure backup system
   include_tasks: backup.yml
   when:
     - postgres_enable_backup | default(true)
     - postgres_replication_role != 'postgres-standby'
-
-- name: Restart PostgreSQL service
-  systemd:
-    name: "{{ postgres_service }}@{{ postgres_version }}-main"
-    state: restarted
-    enabled: yes
-
-- name: Wait for PostgreSQL port to be open on master (only on standby)
-  wait_for:
-    host: "{{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}"
-    port: 5432
-    delay: 10
-    timeout: 300
-  when:
-    - postgres_replication_role == 'postgres-standby'
-    - groups['postgres-master'] is defined
-    - groups['postgres-master'] | length > 0
-
-- name: Check if master PostgreSQL is accepting connections
-  community.postgresql.postgresql_ping:
-    db: postgres
-    login_host: "{{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}"
-    login_user: "{{ postgres_replication_user }}"
-    login_password: "{{ postgres_replication_password }}"
-  delegate_to: "{{ inventory_hostname }}"
-  run_once: false
-  when:
-    - postgres_replication_role == 'standby'
-    - groups['postgres-master'] is defined
-    - groups['postgres-master'] | length > 0
-  retries: 30
-  delay: 10
-  register: pg_ping
-  until: pg_ping is success
-
-- name: Setup base backup for standby
-  block:
-    - name: Create backup directory
-      file:
-        path: "{{ postgres_data_dir }}"
-        state: directory
-        owner: postgres
-        group: postgres
-        mode: '0700'
-
-    - name: Take base backup from master
-      command: >
-        pg_basebackup -h {{ hostvars[groups['postgres-master'][0]]['ansible_host'] }}
-        -U {{ postgres_replication_user }}
-        -D {{ postgres_data_dir }}
-        -X stream
-        -S {{ inventory_hostname | regex_replace('-', '_') }}_slot
-        -R
-      become: true
-      become_user: postgres
-      environment:
-        PGPASSWORD: "{{ postgres_replication_password | default ('123456') }}"
-      when: postgres_replication_role == 'postgres-standby'
-  when:
-    - postgres_replication_role == 'postgres-standby'
-    - slot_status.query_result[0].active is defined
-    - not slot_status.query_result[0].active
-
-- name: Create replication slot on master
-  postgresql_slot:
-    name: "{{ item | regex_replace('-', '_') }}_slot"
-    slot_type: physical
-    state: present
-  loop: "{{ groups['postgres-standby'] }}"
-  when: 
-    - postgres_replication_role == 'postgres-master'
-    - inventory_hostname == groups['postgres-master'][0]
-  become: true
-  become_user: postgres
-
-- name: Create replication user on master
-  postgresql_user:
-    name: "{{ postgres_replication_user }}"
-    password: "{{ postgres_replication_password }}"
-    role_attr_flags: REPLICATION,LOGIN
-    state: present
-  when: 
-    - postgres_replication_role == 'postgres-master'
-    - inventory_hostname == groups['postgres-master'][0]
-  become: true
-  become_user: postgres
-  no_log: true
-
-- name: Set password for postgres user
-  postgresql_user:
-    name: postgres
-    password: "{{ postgres_admin_password }}"
-    state: present
-  become: true
-  become_user: postgres
-  no_log: true
-  when: 
-    - postgres_replication_role != 'postgres-standby'
-
-- name: Create PostgreSQL users
-  postgresql_user:
-    name: "{{ item.name }}"
-    password: "{{ item.password }}"
-    role_attr_flags: "{{ item.flags | default('NOSUPERUSER,NOCREATEDB') }}"
-    state: present
-  loop: "{{ postgres_users | default([]) }}"
-  become: true
-  become_user: postgres
-  no_log: true
-  when: 
-    - postgres_replication_role != 'postgres-standby'
-
-- name: Create PostgreSQL databases
-  postgresql_db:
-    name: "{{ item.name }}"
-    owner: "{{ item.owner }}"
-    encoding: "{{ item.encoding | default('UTF-8') }}"
-    template: "{{ item.template | default('template0') }}"
-    state: present
-  loop: "{{ postgres_databases | default([]) }}"
-  become: true
-  become_user: postgres
-
-- name: Check if replication slot is active
-  community.postgresql.postgresql_query:
-    db: postgres
-    login_user: postgres
-    login_host: "127.0.0.1" 
-    login_password: "{{ postgres_admin_password }}"
-    query: "SELECT active FROM pg_replication_slots WHERE slot_name = '{{ inventory_hostname | regex_replace('-', '_') }}_slot';"
-  register: slot_status
-  run_once: true
-  when: "'postgres-master' in groups and groups['postgres-master'] | length > 0"
-

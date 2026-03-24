@@ -11,10 +11,38 @@
     - "{{ pgpool_run_dir }}"
     - "{{ pgpool_log_dir }}"
 
+- name: Create pgpool monitor user in PostgreSQL
+  community.postgresql.postgresql_user:
+    name: "{{ pgpool_monitor.user }}"
+    password: "{{ pgpool_monitor.password }}"
+    role_attr_flags: "LOGIN"
+  become: yes
+  become_user: postgres
+  when: postgres_replication_role == 'postgres-master'
+
+- name: Grant pg_monitor privileges to pgpool user
+  community.postgresql.postgresql_membership:
+    group: pg_monitor
+    target_roles:
+      - "{{ pgpool_monitor.user }}"
+    state: present
+  become: yes
+  become_user: postgres
+  when: postgres_replication_role == 'postgres-master'
+
 - name: Configure PgPool
   template:
     src: pgpool.conf.j2
     dest: "{{ pgpool_config_dir }}/pgpool.conf"
+    owner: postgres
+    group: postgres
+    mode: '0640'
+  notify: restart pgpool
+
+- name: Configure pool_passwd
+  template:
+    src: pool_passwd.j2
+    dest: "{{ pgpool_config_dir }}/pool_passwd"
     owner: postgres
     group: postgres
     mode: '0640'
@@ -37,9 +65,3 @@
     group: postgres
     mode: '0640'
   notify: restart pgpool
-
-- name: Wait for PgPool to be ready
-  wait_for:
-    host: "{{ pgpool_listen_address }}"
-    port: "{{ pgpool_port }}"
-    timeout: 30

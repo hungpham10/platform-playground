@@ -4,11 +4,15 @@ firewall_default_rules:
     tcp_ports:
       - port: 5432
         comment: "Postgresql server"
+      - port: 6432
+        comment: "Postgresql pool"
     udp_ports: []
   postgres-standby:
     tcp_ports:
       - port: 5432
         comment: "Postgresql server"
+      - port: 6432
+        comment: "Postgresql pool"
     udp_ports: []
   scylladb:
     tcp_ports:

@@ -1,27 +1,24 @@
 ---
-pgpool_required_packages:
-  - pgpool2
-  - postgresql-client
-
 pgpool_config_dir: /etc/pgpool2
 pgpool_run_dir: /var/run/pgpool
 pgpool_log_dir: /var/log/pgpool
 
 # Connection settings
 pgpool_listen_address: '*'
-pgpool_port: 5432
+pgpool_port: 6432
 pgpool_socket_dir: /var/run/postgresql
 
 # Backend nodes configuration
-pgpool_backends:
-  - host: "{{ groups['postgres_master'][0] }}"
-    port: 5432
-    weight: 1
-    data_directory: "/var/lib/postgresql/data"
-  - host: "{{ groups['postgres_standby'][0] }}"
-    port: 5432
-    weight: 1
-    data_directory: "/var/lib/postgresql/data"
+pgpool_backends: |
+  [{% for host in groups['postgres-nodes'] %}
+    {
+      "host": "{{ hostvars[host]['ansible_host'] }}",
+      "port": 5432,
+      "weight": 1,
+      "data_directory": "{{ postgres_data_dir | default('/var/lib/postgresql/data') }}",
+      "flag": "ALLOW_TO_FAILOVER"
+    }{% if not loop.last %},{% endif %}
+  {% endfor %}]
 
 # Pool settings
 pgpool_num_init_children: 32
@@ -37,4 +34,6 @@ pgpool_master_slave_sub_mode: 'stream'
 
 # Authentication
 pgpool_enable_pool_hba: on
-pgpool_pool_passwd: "{{ vault_pgpool_pool_passwd }}"
+pgpool_monitor:
+  user: "pgpool"
+  password: "rootroot"

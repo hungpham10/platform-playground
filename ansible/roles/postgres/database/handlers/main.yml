@@ -4,6 +4,11 @@
     name: "{{ postgres_service }}@{{ postgres_version }}-main"
     state: restarted
 
+- name: restart repmgrd
+  systemd:
+    name: repmgrd
+    state: restarted
+
 - name: daemon reload
   systemd:
     daemon_reload: yes

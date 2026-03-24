@@ -1,66 +1,64 @@
+
 ---
 - name: Ensure .ssh directory exists on all nodes
   file:
-    path: "/home/{{ ssh_user }}/.ssh"
+    path: "{{ ssh_home }}/.ssh"
     state: directory
     owner: "{{ ssh_user }}"
     group: "{{ ssh_user }}"
     mode: '0700'
 
-- name: Generate SSH key pair on each node (if not exists)
+- name: Configure SSH to skip host key checking (Fix for pgBackRest)
+  copy:
+    dest: "{{ ssh_home }}/.ssh/config"
+    content: |
+      Host *
+        StrictHostKeyChecking no
+        UserKnownHostsFile /dev/null
+    owner: "{{ ssh_user }}"
+    group: "{{ ssh_user }}"
+    mode: '0600'
+
+- name: Generate SSH key pair once (Only on the first node)
   command: >
-    ssh-keygen -t {{ ssh_key_type }} -b {{ ssh_key_size }} -f /home/{{ ssh_user }}/.ssh/{{ ssh_key_name }} -N "" -q
+    ssh-keygen -t {{ ssh_key_type }} -b {{ ssh_key_size | default(4096) }} 
+    -f {{ ssh_home }}/.ssh/{{ ssh_key_name }} -N "" -q
   args:
-    creates: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}"
+    creates: "{{ ssh_home }}/.ssh/{{ ssh_key_name }}"
   become_user: "{{ ssh_user }}"
-  register: keygen_result
+  when: inventory_hostname == ansible_play_hosts[0]
 
-- name: Wait for public key file to exist and have content
-  wait_for:
-    path: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}.pub"
-    state: present
-    search_regex: "^ssh-"   # đảm bảo file có nội dung hợp lệ (bắt đầu bằng ssh-rsa hoặc ssh-ed25519...)
-  delay: 2
-  timeout: 30
-  become: yes
-  become_user: "{{ ssh_user }}"
-  ignore_errors: no   # sẽ fail nếu quá 30s vẫn không có
-
-- name: Read public key from each node
+- name: Read the shared keys from the first node
   slurp:
-    src: "/home/{{ ssh_user }}/.ssh/{{ ssh_key_name }}.pub"
-  register: node_public_keys
+    src: "{{ ssh_home }}/.ssh/{{ item }}"
+  register: shared_keys
+  loop:
+    - "{{ ssh_key_name }}"
+    - "{{ ssh_key_name }}.pub"
+  when: inventory_hostname == ansible_play_hosts[0]
 
-- name: Distribute current node's public key to all nodes' authorized_keys
+- name: Distribute shared keys to all nodes
+  copy:
+    # Sửa: ansible_play_hosts -> ansible_play_hosts
+    content: "{{ (hostvars[ansible_play_hosts[0]]['shared_keys']['results'] | selectattr('item', 'equalto', item.name) | first).content | b64decode }}"
+    dest: "{{ ssh_home }}/.ssh/{{ item.name }}"
+    owner: "{{ ssh_user }}"
+    group: "{{ ssh_user }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { name: "{{ ssh_key_name }}", mode: '0600' }
+    - { name: "{{ ssh_key_name }}.pub", mode: '0644' }
+  loop_control:
+    label: "Syncing {{ item.name }} from {{ ansible_play_hosts[0] }}"
+
+- name: Add shared public key to authorized_keys on all nodes
   ansible.posix.authorized_key:
     user: "{{ ssh_user }}"
     state: present
-    key: "{{ node_public_keys.content | b64decode | trim }}"
+    key: "{{ (hostvars[ansible_play_hosts[0]]['shared_keys']['results'] | selectattr('item', 'search', '.pub') | first).content | b64decode }}"
     manage_dir: true
-  delegate_to: "{{ item }}"
-  loop: "{{ ansible_play_hosts }}"
-  when: node_public_keys.content is defined
 
-- name: Collect all hostnames
-  set_fact:
-    all_hostnames: "{{ ansible_play_hosts | map('regex_replace', '^(.*)$', '\\1') | list | unique }}"
-  run_once: true
-
-- name: Read authorized_keys on each node
-  slurp:
-    src: "/home/{{ ssh_user }}/.ssh/authorized_keys"
-  register: auth_keys
+- name: Verify SSH connectivity to self and peers
+  command: "ssh -o BatchMode=yes -o ConnectTimeout=5 {{ ansible_host }} /bin/true"
   become_user: "{{ ssh_user }}"
-
-- name: Parse authorized_keys content
-  set_fact:
-    configured_hostnames: "{{ auth_keys.content | b64decode | split('\n') | reject('equalto', '') | map('split', '@') | map('last') }}"
-
-- name: Check for missing hostnames in authorized_keys
-  set_fact:
-    missing_hostnames: "{{ all_hostnames | reject('in', configured_hostnames) | list }}"
-
-- name: Fail if any hostname is missing in authorized_keys
-  fail:
-    msg: "Thiếu hostname trong authorized_keys trên {{ inventory_hostname }}: {{ missing_hostnames | join(', ') }}"
-  when: missing_hostnames | length > 0
+  changed_when: false

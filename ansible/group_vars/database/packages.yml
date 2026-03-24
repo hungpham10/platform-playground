@@ -51,11 +51,23 @@ role_package_repos:
 
   # PostgreSQL official repositories
   postgres-master:
-    yum: []
+    yum:
+      - name: "pgdg{{ postgres_version | replace('.', '') }}"
+        description: "PostgreSQL {{ postgres_version }} for RHEL/CentOS $releasever"
+        baseurl: "https://download.postgresql.org/pub/repos/yum/{{ postgres_version }}/redhat/rhel-$releasever-$basearch"
+        gpgcheck: yes
+        gpgkey: "https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG"
+        enabled: yes
     apt:
       - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
   postgres-standby:
-    yum: []
+    yum:
+      - name: "pgdg{{ postgres_version | replace('.', '') }}"
+        description: "PostgreSQL {{ postgres_version }} for RHEL/CentOS $releasever"
+        baseurl: "https://download.postgresql.org/pub/repos/yum/{{ postgres_version }}/redhat/rhel-$releasever-$basearch"
+        gpgcheck: yes
+        gpgkey: "https://download.postgresql.org/pub/repos/yum/RPM-GPG-KEY-PGDG"
+        enabled: yes
     apt:
       - "deb [signed-by=/usr/share/keyrings/postgresql.asc] http://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
 
@@ -86,7 +98,34 @@ role_packages:
 
   # Required packages for PostgreSQL database servers
   postgres-master:
-    yum: []
+    yum:
+      # Core PostgreSQL
+      - "postgresql{{ postgres_version | replace('.', '') }}-server"
+      - "postgresql{{ postgres_version | replace('.', '') }}-devel"
+      - "postgresql{{ postgres_version | replace('.', '') }}-contrib"
+      
+      # Python & Libs
+      - python3-psycopg2
+      - libpq-devel
+      
+      # Tools (Cần enable EPEL repo nếu một số gói không có sẵn trong PGDG)
+      - pgbackrest
+      - pgbadger
+      - pg_activity
+      
+      # Failover (pg_auto_failover)
+      - "postgresql-{{ pg_version }}-repmgr"
+      
+      # Performance & Extensions
+      - "rum_{{ postgres_version | replace('.', '') }}"
+      - "hypopg_{{ postgres_version | replace('.', '') }}"
+      - "pg_cron_{{ postgres_version | replace('.', '') }}"
+      - "pg_partman_{{ postgres_version | replace('.', '') }}"
+      
+      # System utilities
+      - net-tools
+      - iotop
+      - sysstat
     apt:
       # Core PostgreSQL packages
       - postgresql-{{ postgres_version }}
@@ -112,7 +151,10 @@ role_packages:
       - pg-activity
       - pgbadger
       - pgtop
-      
+
+      # Failover
+      - "postgresql-{{ postgres_version }}-repmgr"
+
       # Connection pooling
       - pgpool2
       - postgresql-client    
@@ -131,7 +173,34 @@ role_packages:
       - sysstat
 
   postgres-standby:
-    yum: []
+    yum:
+      # Core PostgreSQL
+      - "postgresql{{ postgres_version | replace('.', '') }}-server"
+      - "postgresql{{ postgres_version | replace('.', '') }}-devel"
+      - "postgresql{{ postgres_version | replace('.', '') }}-contrib"
+      
+      # Python & Libs
+      - python3-psycopg2
+      - libpq-devel
+      
+      # Tools (Cần enable EPEL repo nếu một số gói không có sẵn trong PGDG)
+      - pgbackrest
+      - pgbadger
+      - pg_activity
+      
+      # Failover (pg_auto_failover)
+      - "postgresql-{{ postgres_version }}-repmgr"
+      
+      # Performance & Extensions
+      - "rum_{{ postgres_version | replace('.', '') }}"
+      - "hypopg_{{ postgres_version | replace('.', '') }}"
+      - "pg_cron_{{ postgres_version | replace('.', '') }}"
+      - "pg_partman_{{ postgres_version | replace('.', '') }}"
+      
+      # System utilities
+      - net-tools
+      - iotop
+      - sysstat
     apt:
       # Core PostgreSQL packages
       - postgresql-{{ postgres_version }}
@@ -157,7 +226,10 @@ role_packages:
       - pg-activity
       - pgbadger
       - pgtop
-      
+
+      # Failover
+      - "postgresql-{{ postgres_version }}-repmgr"
+
       # Connection pooling
       - pgpool2
       - postgresql-client    

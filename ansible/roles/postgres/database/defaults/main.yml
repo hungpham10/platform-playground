@@ -25,8 +25,13 @@ postgres_archive_command: "/usr/bin/pgbackrest --stanza=main archive-push %p"
 
 # Replication Configuration
 postgres_replication_role: standalone  # Options: master, standby, standalone
-postgres_replication_user: replicator
-postgres_replication_password: '123456'
+postgres_replication:
+  user: replicator
+  password: '123456'
+postgres_replication_manager:
+  enabled: true
+  user: repmgr
+  password: '123456'
 postgres_wal_keep_segments: 32
 postgres_script_dir: /usr/local/bin
 

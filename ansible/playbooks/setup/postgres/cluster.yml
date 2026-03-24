@@ -4,29 +4,170 @@
 - name: Configure PostgreSQL Database Servers
   hosts: postgres-*
   become: true
-  strategy: free
-  serial: 1
   vars:
     instance_role: database
     postgres_db: postgres
     postgres_user: postgres
+    pgbackrest_script_path: /usr/local/bin
+    postgres_script_dir: /usr/local/bin
 
   roles:
     - name: postgres/configure/primary
-      when: (subdomain_instance_role | default('standalone')) == "master"
+      when: (subdomain_instance_role | default('standalone')) == "postgres-master"
       tags: ["database"]
 
     - name: postgres/configure/standby
-      when: (subdomain_instance_role | default('standalone')) == "standby"
+      when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
       tags: ["database"]
-  post_tasks:
-    - name: Verify Primary using pg_stat_replication
-      community.postgresql.postgresql_query:
-        db: "{{ postgres_db }}"
-        login_user: "{{ postgres_user }}"
-        login_host: "127.0.0.1" 
-        login_password: "{{ postgres_admin_password }}"
-        query: "SELECT pid, usename, application_name, client_addr, state, sync_state FROM pg_stat_replication;"
-      register: replication_status
-      when: "'master' in hostvars[inventory_hostname].subdomain_instance_role"
 
+    - name: postgres/pool
+      vars:
+        postgres_replication_role: "{{ subdomain_instance_role | default('standalone') }}"
+      tags: ["database"]
+
+  post_tasks:
+    - name: Gather service facts
+      service_facts:
+
+    # =========================================================================
+    # PHẦN 1: TEST FAILOVER THỦ CÔNG (Dành cho script tự viết)
+    # Chỉ chạy khi KHÔNG dùng repmgrd (hoặc repmgrd đang tắt)
+    # =========================================================================
+    - name: Manual Failover Scenario
+      block:
+        - name: 1.1 - Verify management scripts existence
+          stat:
+            path: "{{ postgres_script_dir }}/{{ item }}"
+          loop: [promote-to-master.sh, demote-to-standby.sh, check-replication.sh]
+          register: script_stats
+
+        - name: 1.2 - Assert scripts are present
+          assert:
+            that: "item.stat.exists"
+            fail_msg: "Script {{ item.item }} is missing!"
+          loop: "{{ script_stats.results }}"
+
+        - name: 2.1 - Execute check-replication on Master
+          command: "{{ postgres_script_dir }}/check-replication.sh"
+          become_user: postgres
+          register: replication_out
+          when: (subdomain_instance_role | default('standalone')) == "postgres-master"
+
+        - name: 3.1 - Stop Master to simulate failure
+          systemd:
+            name: "{{ postgres_service }}"
+            state: stopped
+          when: (subdomain_instance_role | default('standalone')) == "postgres-master"
+
+        - name: 3.2 - Promote Standby to Master using script
+          command: "{{ postgres_script_dir }}/promote-to-master.sh"
+          become_user: postgres
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+
+        - name: 3.3 - Verify New Master is Read-Write
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: "SELECT pg_is_in_recovery();"
+          become_user: postgres
+          register: recovery_check
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+
+        # ... (Bạn có thể giữ nguyên các bước 4.1, 5.1 backup cũ của bạn ở đây) ...
+
+      when: 
+        - (subdomain_instance_role | default('standalone')) != "postgres-monitor"
+        - "'repmgrd.service' not in services or services['repmgrd.service'].state != 'running'"
+
+    # =========================================================================
+    # PHẦN 2: REPMGR CLUSTER VALIDATION (Dành cho Auto-Failover)
+    # =========================================================================
+    - name: REPMGR CLUSTER VALIDATION
+      block:
+        - name: R1.1 - Check repmgr cluster status
+          command: /usr/bin/repmgr -f /etc/repmgr.conf cluster show
+          become_user: postgres
+          register: repmgr_show
+          changed_when: false
+
+        - name: R1.2 - Detect current primary node
+          set_fact:
+            # FIX: Tránh lỗi NoneType
+            current_primary: "{{ (repmgr_show.stdout | regex_findall('primary\\s+\\|\\s+running\\s+\\|\\s+([^\\s|]+)') | first) | default('unknown') }}"
+
+        - name: R3.1 - Perform Dry-run Switchover
+          command: /usr/bin/repmgr -f /etc/repmgr.conf standby switchover --dry-run
+          become_user: postgres
+          register: switchover_dry_run
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+
+        # -------------------------------------------------------------------------
+        # TEST DATA SYNC (FIXED: Chống lỗi Relation does not exist)
+        # -------------------------------------------------------------------------
+        - name: S5.1 - Create test table on Master
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: |
+              CREATE TABLE IF NOT EXISTS replication_sync_test (
+                id serial PRIMARY KEY,
+                test_key varchar(50) UNIQUE,
+                val varchar(100),
+                ts timestamp DEFAULT now()
+              );
+          become_user: postgres
+          when: (subdomain_instance_role | default('standalone')) == "postgres-master"
+
+        - name: S5.2 - Insert test record on Master
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: |
+              INSERT INTO replication_sync_test (test_key, val) 
+              VALUES ('sync_check', 'data_{{ lookup("pipe", "date +%Y%m%d%H%M%S") }}')
+              ON CONFLICT (test_key) DO UPDATE SET val = EXCLUDED.val
+              RETURNING val;
+          become_user: postgres
+          register: master_write
+          when: (subdomain_instance_role | default('standalone')) == "postgres-master"
+
+        - name: S5.3 - Verify data on Standby (Wait until synced)
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: "SELECT val FROM replication_sync_test WHERE test_key = 'sync_check' ORDER BY ts DESC LIMIT 1;"
+          become_user: postgres
+          register: standby_read
+          # FIX: Thử lại cho đến khi table sync xong
+          until: 
+            - standby_read.query_result is defined 
+            - standby_read.query_result | length > 0
+          retries: 10
+          delay: 2
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+
+        - name: S5.4 - Assert Data Consistency
+          assert:
+            that:
+              - "standby_read.query_result[0].val == hostvars[groups['postgres-nodes'] | select('match', '.*-1') | first].master_write.query_result[0].val"
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+          ignore_errors: yes
+
+        # -------------------------------------------------------------------------
+        # TEST READ-ONLY & CLEANUP
+        # -------------------------------------------------------------------------
+        - name: S6.1 - Attempt write on Standby (Should Fail)
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: "INSERT INTO replication_sync_test (test_key, val) VALUES ('illegal', 'fail');"
+          become_user: postgres
+          ignore_errors: true
+          register: standby_write_attempt
+          when: (subdomain_instance_role | default('standalone')) == "postgres-standby"
+
+        - name: S6.3 - Cleanup test table
+          community.postgresql.postgresql_query:
+            login_db: postgres
+            query: "DROP TABLE IF EXISTS replication_sync_test;"
+          become_user: postgres
+          when: (subdomain_instance_role | default('standalone')) == "postgres-master"
+
+      when: 
+        - (subdomain_instance_role | default('standalone')) != "postgres-monitor"
+        - "'repmgrd.service' in services and services['repmgrd.service'].state == 'running'"

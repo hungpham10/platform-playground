@@ -1,30 +1,64 @@
-# Basic settings
+
+#------------------------------------------------------------------------------
+# BASIC SETTINGS
+#------------------------------------------------------------------------------
 listen_addresses = '{{ pgpool_listen_address }}'
 port = {{ pgpool_port }}
 socket_dir = '{{ pgpool_socket_dir }}'
+pcp_port = 9898
+pcp_socket_dir = '{{ pgpool_socket_dir }}'
 pid_file_name = '{{ pgpool_run_dir }}/pgpool.pid'
 logdir = '{{ pgpool_log_dir }}'
 
-# Connection pooling
+#------------------------------------------------------------------------------
+# CONNECTION POOLING
+#------------------------------------------------------------------------------
 num_init_children = {{ pgpool_num_init_children }}
 max_pool = {{ pgpool_max_pool }}
 child_life_time = {{ pgpool_child_life_time }}
 connection_life_time = {{ pgpool_connection_life_time }}
 client_idle_limit = {{ pgpool_client_idle_limit }}
 
-# Backend settings
-{% for backend in pgpool_backends %}
+#------------------------------------------------------------------------------
+# BACKEND SETTINGS (Dynamic from postgres-nodes)
+#------------------------------------------------------------------------------
+{% for backend in (pgpool_backends | from_json) %}
 backend_hostname{{ loop.index0 }} = '{{ backend.host }}'
 backend_port{{ loop.index0 }} = {{ backend.port }}
 backend_weight{{ loop.index0 }} = {{ backend.weight }}
 backend_data_directory{{ loop.index0 }} = '{{ backend.data_directory }}'
+backend_flag{{ loop.index0 }} = 'ALLOW_TO_FAILOVER'
 {% endfor %}
 
-# Load balancing and replication
+#------------------------------------------------------------------------------
+# MASTER/SLAVE & LOAD BALANCING
+#------------------------------------------------------------------------------
+master_slave_mode = on
+master_slave_sub_mode = 'stream'
 load_balance_mode = {{ pgpool_load_balance_mode }}
-master_slave_mode = {{ pgpool_master_slave_mode }}
-master_slave_sub_mode = '{{ pgpool_master_slave_sub_mode }}'
+replication_mode = off
 
-# Authentication
+#------------------------------------------------------------------------------
+# AUTHENTICATION (DYNAMIC FROM DB)
+#------------------------------------------------------------------------------
 enable_pool_hba = {{ pgpool_enable_pool_hba }}
-pool_passwd = '{{ pgpool_pool_passwd }}'
+
+# Đường dẫn file pool_passwd (vẫn cần để chứa pass của user 'pgpool')
+pool_passwd = '{{ pgpool_config_dir }}/pool_passwd'
+
+# Cấu hình để PgPool tự động "tra cứu" mật khẩu từ Postgres
+# Bạn cần tạo user này trong Postgres và GRANT pg_monitor
+sr_check_user = '{{ pgpool_monitor.user }}'
+sr_check_password = '{{ pgpool_monitor.password }}'
+sr_check_database = 'postgres'
+
+# Tự động refresh danh sách mật khẩu từ bảng pg_shadow mỗi 60 giây
+pg_auth_refresh_interval = 60
+
+#------------------------------------------------------------------------------
+# HEALTH CHECK
+#------------------------------------------------------------------------------
+health_check_period = 10
+health_check_user = 'pgpool'
+health_check_password = '{{ pgpool_monitor.password }}'
+health_check_database = 'postgres'

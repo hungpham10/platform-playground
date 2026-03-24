@@ -1,6 +1,7 @@
 ---
 # SSH user for all nodes
 ssh_user: "{{ ansible_user }}"
+ssh_home: "/home/{{ ssh_user }}"
 
 # SSH key name (will be created in ~/.ssh/)
 ssh_key_name: "id_ed25519"

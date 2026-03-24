@@ -42,6 +42,10 @@ shared_buffers = {{ postgres_shared_buffers }}
 effective_cache_size = {{ postgres_effective_cache_size }}
 maintenance_work_mem = {{ postgres_maintenance_work_mem }}
 work_mem = {{ postgres_work_mem }}
+{% if postgres_replication_manager.enabled %}
+shared_preload_libraries = 'repmgr'
+max_worker_processes = 15    
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # WRITE AHEAD LOG (WAL)
@@ -51,6 +55,11 @@ max_wal_senders = {{ postgres_max_wal_senders }}
 max_replication_slots = {{ postgres_max_replication_slots }}
 archive_mode = {{ postgres_archive_mode }}
 archive_command = '{{ postgres_archive_command }}'
+
+{% if postgres_version | int > 16 %}
+sync_replication_slots = on
+hot_standby_feedback = on
+{% endif %}
 
 # ------------------------------------------------------------------------------
 # LOGGING
@@ -80,3 +89,5 @@ autovacuum_vacuum_scale_factor = 0.2 # Fraction of table size to add to vacuum_t
 autovacuum_analyze_scale_factor = 0.1 # Fraction of table size to add to analyze_threshold
 
 include_dir = 'conf.d'
+
+

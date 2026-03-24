@@ -43,6 +43,13 @@
       set_fact:
         postgres_database_list: "{{ (postgres_database_list | default([])) + postgres_database_default_list }}"
   roles:
+    # Setup ssh
+    - role: ssh
+      vars:
+        ssh_user: "postgres"
+        ssh_home: "/var/lib/postgresql"
+      tags: ["cluster"]
+
     # Setup storage
     - role: storage
       tags: ["storage"]
@@ -63,11 +70,13 @@
         postgres_users: "{{ postgres_database_users }}"
         postgres_databases: "{{ postgres_database_list }}"
         postgres_replication_role: "{{ subdomain_instance_role | default('standalone') }}"
+      when: (subdomain_instance_role | default('standalone')) != "postgres-monitor"
       tags: ["database", "postgres"]
 
-    # PostgreSQL Citus stup
+    # PostgreSQL Citus setup
     #- role: postgres/citus
     #  tags: ["database", "postgres"]
+    #  when: (subdomain_instance_role | default('standalone')) not in ["postgres-monitor", "standalone"]
 
     # Configure PostgreSQL logging
     - role: logrotate
@@ -100,6 +109,7 @@
               id: 30
             create: "0640 root adm"
             postrotate_script: "/usr/lib/rsyslog/rsyslog-rotate"
+      when: (subdomain_instance_role | default('standalone')) != "postgres-monitor"
       tags: ["monitoring"]
 
     # PostgreSQL analysis and monitoring
@@ -111,6 +121,7 @@
         enable_auto_explain: true
         pg_analysis_email_to: "{{ mail_defaults.dba_email }}"
         pg_analysis_smtp_relay: "localhost"
+      when: (subdomain_instance_role | default('standalone')) != "postgres-monitor"
       tags: ["database", "postgres", "monitoring"]
 
     # PostgreSQL analysis and monitoring with PMM
@@ -125,6 +136,7 @@
         pmm_metrics_resolution: "{{ monitoring_defaults.metrics_resolution | default('1s') }}"
         pmm_metrics_retention: "{{ monitoring_defaults.metrics_retention | default('30d') }}"
         pmm_agent_debug: "{{ monitoring_defaults.enable_debug | default(false) }}"
+      when: (subdomain_instance_role | default('standalone')) != "postgres-monitor"
       tags: ["monitoring", "pmm"]
   post_tasks:
     - name: Verify cluster status
@@ -193,4 +205,5 @@
         register: pgbackrest_check
         failed_when: pgbackrest_check.rc != 0
         when: (subdomain_instance_role | default('standalone')) != "postgres-standby"
+      when: (subdomain_instance_role | default('standalone')) != "postgres-monitor"
       tags: ["verify", "monitoring"]

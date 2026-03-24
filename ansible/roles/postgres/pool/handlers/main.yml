@@ -1,5 +1,5 @@
 ---
-- name: restart proxysql
+- name: restart pgpool
   systemd:
-    name: proxysql
+    name: pgpool2
     state: restarted

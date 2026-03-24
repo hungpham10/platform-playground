@@ -1,0 +1,11 @@
+role_users:
+  search:
+    - name: postgres
+      uid: 2003
+      groups: ['postgres']
+      ssh_keys: []
+
+role_groups:
+  search:
+    - name: postgres
+      gid: 2003
