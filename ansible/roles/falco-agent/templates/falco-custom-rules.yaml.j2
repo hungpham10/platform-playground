@@ -1,0 +1,40 @@
+- rule: Syscall execve
+  desc: Get execve logs
+  condition: evt.type=execve
+  output: >
+    %evt.time
+    %evt.type
+    %evt.category
+    %evt.res
+    %syscall.type
+{%- if falco_include_container_fields | default(false) %}
+    %container.type
+    %container.privileged
+    %container.ip
+    %container.image
+    %container.image.id
+    %container.image.digest
+    %k8s.pod.uid
+    %k8s.pod.ip
+{%- endif %}
+    %user.name
+    %user.uid
+    %user.loginname
+    %user.loginuid
+    %group.gid
+    %group.name
+    %proc.exepath
+    %proc.cmdline
+    %proc.pid
+{%- if falco_include_container_fields | default(false) %}
+    %proc.pexepath
+{%- endif %}
+    %proc.pcmdline
+    %proc.ppid
+    %proc.cwd
+    %proc.tty
+    %proc.sid
+    %proc.vpgid
+    %thread.tid
+    %thread.vtid
+  priority: INFO

@@ -1,0 +1,11 @@
+debug: false
+
+listenaddress: "{{ falcosidekick_listen_address }}"
+listenport: {{ falcosidekick_listen_port }}
+
+kafka:
+  hostport: "{{ falcosidekick_kafka_hostport }}"
+  topic: "{{ falcosidekick_kafka_topic }}"
+  sasl: "{{ falcosidekick_kafka_sasl }}"
+  username: "{{ falcosidekick_kafka_username }}"
+  password: "{{ falcosidekick_kafka_password }}"

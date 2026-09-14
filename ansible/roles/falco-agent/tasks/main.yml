@@ -1,0 +1,12 @@
+---
+- name: Install Falco
+  include_tasks: install_falco.yml
+  when: ansible_os_family == "RedHat"
+
+- name: Install and configure Falcosidekick
+  include_tasks: install_falcosidekick.yml
+  when: ansible_os_family == "RedHat"
+
+- name: Configure Falco
+  include_tasks: config_falco.yml
+  when: ansible_os_family == "RedHat"

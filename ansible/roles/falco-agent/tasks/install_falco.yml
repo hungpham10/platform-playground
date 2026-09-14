@@ -1,0 +1,129 @@
+---
+# Import Falco GPG key
+- name: Import Falco GPG key
+  rpm_key:
+    key: https://falco.org/repo/falcosecurity-packages.asc
+    state: present
+    validate_certs: no
+
+# Add Falco yum repository
+- name: Add Falco yum repository
+  get_url:
+    url: https://falco.org/repo/falcosecurity-rpm.repo
+    dest: /etc/yum.repos.d/falcosecurity.repo
+    mode: "0644"
+    validate_certs: no
+
+# Install build dependencies
+- name: Install build dependencies
+  yum:
+    name:
+      - dkms
+      - make
+      - clang
+      - llvm
+      - dialog
+    state: present
+  when: false
+
+# Install kernel-devel for running kernel
+# The running kernel may differ from the latest in the repo,
+# so we try multiple strategies:
+#   1. Direct install kernel-devel-$(uname -r)
+#   2. Create vault repo for the kernel's releasever and retry
+#   3. Distro-sync and retry
+#   4. Install any available kernel-devel as last resort
+
+# Determine the vault releasever
+# Primary: use OS version (e.g. 9.5), fallback: parse from kernel suffix
+- name: Determine vault releasever from OS version
+  set_fact:
+    vault_releasever: "{{ ansible_distribution_version }}"
+  when: ansible_os_family == "RedHat"
+
+# If kernel version suffix differs from OS version (e.g. old kernel on updated OS),
+# prefer the kernel's version since that's where the matching kernel-devel lives
+- name: Determine vault releasever from kernel version
+  shell: |
+    kernel="{{ ansible_kernel }}"
+    # e.g. 5.14.0-503.40.1.el9_5 -> 9.5
+    echo "$kernel" | sed -n 's/.*el\([0-9]*\)_\([0-9]*\).*/\1.\2/p'
+  register: kernel_releasever_raw
+  changed_when: false
+  when: ansible_os_family == "RedHat"
+
+- name: Override vault_releasever with kernel version if different
+  set_fact:
+    vault_releasever: "{{ kernel_releasever_raw.stdout | trim }}"
+  when: |
+    kernel_releasever_raw is not skipped and
+    kernel_releasever_raw.stdout | trim != '' and
+    kernel_releasever_raw.stdout | trim != vault_releasever
+
+# Step 1: Try direct install
+- name: Install kernel-devel for running kernel
+  yum:
+    name: "kernel-devel-{{ ansible_kernel }}"
+    state: present
+  register: kernel_devel_result
+  ignore_errors: true
+
+# Step 2: If failed, create vault repo and retry
+- name: Deploy Rocky Linux vault repo for older packages
+  template:
+    src: rocky-vault.repo.j2
+    dest: /etc/yum.repos.d/rocky-vault.repo
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - kernel_devel_result is failed
+    - ansible_distribution == "Rocky"
+  ignore_errors: true
+
+- name: Retry kernel-devel install from vault repos
+  yum:
+    name: "kernel-devel-{{ ansible_kernel }}"
+    state: present
+    update_cache: yes
+  register: kernel_devel_vault_result
+  when: kernel_devel_result is failed
+
+# Step 3: If vault also fails, try distro-sync
+- name: Distro sync to fix package dependencies
+  shell: yum distro-sync -y
+  when: kernel_devel_result is failed and kernel_devel_vault_result is failed
+  changed_when: true
+
+- name: Reinstall kernel-devel after distro-sync
+  yum:
+    name: "kernel-devel-{{ ansible_kernel }}"
+    state: present
+  register: kernel_devel_distrosync_result
+  when: kernel_devel_result is failed and kernel_devel_vault_result is failed
+
+# Step 4: Last resort - install any available kernel-devel
+# (may not match running kernel exactly, but falco driver loader
+# can still build against it)
+- name: Install any available kernel-devel (last resort)
+  yum:
+    name: kernel-devel
+    state: present
+  when: |
+    kernel_devel_result is failed and
+    kernel_devel_vault_result is failed and
+    kernel_devel_distrosync_result is failed
+
+# Install Falco - CentOS 7 (pinned version, eBPF not supported)
+- name: Install Falco (CentOS 7 - pinned version)
+  yum:
+    name: "falco-{{ falco_version_centos7 }}"
+    state: present
+  when: ansible_distribution_major_version == "7"
+
+# Install Falco - Rocky Linux 9+ (latest version, eBPF supported)
+- name: Install Falco (Rocky Linux 9+ - latest)
+  yum:
+    name: falco
+    state: present
+  when: ansible_distribution_major_version | int >= 9

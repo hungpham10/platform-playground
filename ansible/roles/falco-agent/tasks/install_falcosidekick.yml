@@ -1,0 +1,81 @@
+---
+# Get latest falcosidekick release version from GitHub
+- name: Get latest falcosidekick release version
+  shell: >
+    curl --silent -qI https://github.com/falcosecurity/falcosidekick/releases/latest |
+    awk -F '/' '/ocation/ {print substr($NF, 1, length($NF)-1)}'
+  register: falcosidekick_version_raw
+
+- debug:
+    msg: "{{ falcosidekick_version_raw.stdout }}"
+
+- name: Set falcosidekick version fact
+  set_fact:
+    falcosidekick_version: "{{ falcosidekick_version_raw.stdout | trim }}"
+
+# Download and extract falcosidekick
+- name: Download falcosidekick
+  get_url:
+    url: "https://github.com/falcosecurity/falcosidekick/releases/download/{{ falcosidekick_version }}/falcosidekick_{{ falcosidekick_version }}_linux_amd64.tar.gz"
+    dest: "/tmp/falcosidekick_{{ falcosidekick_version }}_linux_amd64.tar.gz"
+    validate_certs: no
+
+- name: Extract falcosidekick
+  unarchive:
+    src: "/tmp/falcosidekick_{{ falcosidekick_version }}_linux_amd64.tar.gz"
+    dest: /tmp/
+    remote_src: yes
+
+- name: Install falcosidekick binary
+  copy:
+    src: /tmp/falcosidekick
+    dest: /usr/local/bin/falcosidekick
+    owner: root
+    group: root
+    mode: "0755"
+    remote_src: yes
+
+# Create falcosidekick configuration
+- name: Create falcosidekick configuration directory
+  file:
+    path: /etc/falcosidekick
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy falcosidekick configuration
+  template:
+    src: falcosidekick-config.yaml.j2
+    dest: /etc/falcosidekick/config.yaml
+    owner: root
+    group: root
+    mode: "0640"
+  notify: restart falcosidekick
+
+# Create and enable falcosidekick systemd service
+- name: Deploy falcosidekick systemd service
+  template:
+    src: falcosidekick.service.j2
+    dest: /etc/systemd/system/falcosidekick.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - reload systemd
+    - restart falcosidekick
+
+- name: Enable and start falcosidekick
+  service:
+    name: falcosidekick
+    enabled: yes
+    state: started
+
+# Cleanup downloaded files
+- name: Cleanup falcosidekick downloaded files
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "/tmp/falcosidekick_{{ falcosidekick_version }}_linux_amd64.tar.gz"
+    - /tmp/falcosidekick

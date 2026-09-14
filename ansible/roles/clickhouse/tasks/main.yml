@@ -61,7 +61,17 @@
     group: clickhouse
     mode: 0660
   notify: Restart clickhouse
-#
+
+- name: Render config.d/log-ttl.xml
+  template:
+    src: log-ttl.xml.j2
+    dest: "{{ clickhouse_conf_dir }}/config.d/log-ttl.xml"
+    owner: clickhouse
+    group: clickhouse
+    mode: 0660
+  when: clickhouse_log_ttl_days is defined
+  notify: Restart clickhouse
+
 #- name: Render users.d/users.xml
 #  template:
 #    src: users.xml.j2

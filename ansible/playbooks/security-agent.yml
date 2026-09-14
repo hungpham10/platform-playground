@@ -1,0 +1,47 @@
+---
+- name: Configure Base Instance
+  hosts: all
+  become: true
+  roles:
+    - role: wazuh-agent
+      tags: ["wazuh"]
+    - role: falco-agent
+      tags: ["falco"]
+
+  post_tasks:
+    - name: Verify Wazuh agent package is installed
+      package:
+        name: wazuh-agent
+        state: present
+      register: wazuh_package_check
+      changed_when: false
+
+    - name: Check if Wazuh agent service is running
+      service:
+        name: wazuh-agent
+        state: started
+        enabled: yes
+      register: wazuh_service_check
+      retries: 3
+      delay: 5
+      until: wazuh_service_check is succeeded
+
+    - name: Verify connection to Wazuh manager on port 1514
+      wait_for:
+        host: "{{ wazuh_manager_ip | default('wazuh-manager') }}"
+        port: 1514
+        state: started
+        timeout: 10
+        connect_timeout: 5
+      register: wazuh_port_check
+      delegate_to: "{{ inventory_hostname }}"
+      ignore_errors: yes
+
+    - name: Display Wazuh agent verification results
+      debug:
+        msg:
+          - "Wazuh Agent Status:"
+          - "  Package installed: {{ wazuh_package_check is succeeded }}"
+          - "  Service running: {{ wazuh_service_check is succeeded }}"
+          - "  Port 1514 reachable: {{ wazuh_port_check is succeeded }}"
+      when: wazuh_package_check is succeeded or wazuh_service_check is succeeded

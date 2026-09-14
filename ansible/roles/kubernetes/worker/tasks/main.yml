@@ -49,7 +49,7 @@
     
     - name: Write worker token to secondary masters
       copy:
-        content: "{{ worker_token | default(worker_token.content | b64decode | default('')) }}"
+        content: "{{ worker_token.content | b64decode | default('') }}"
         dest: /etc/k0s/worker-token
         mode: '0600'
         owner: root

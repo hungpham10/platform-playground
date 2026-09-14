@@ -79,4 +79,4 @@
   service:
     name: wazuh-agent
     enabled: true
-    state: started
+    state: restarted

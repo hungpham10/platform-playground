@@ -185,3 +185,4 @@
         - inventory_hostname != groups['masters'] | first
         - k0s_service_status.status.ActiveState != "active"
   when: inventory_hostname in groups['masters']
+

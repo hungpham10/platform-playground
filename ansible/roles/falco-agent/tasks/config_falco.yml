@@ -1,0 +1,116 @@
+---
+# Configure falco.yaml
+
+# Ensure /etc/falco/rules.d is included in rules_files
+- name: Ensure rules.d directory is in rules_files
+  lineinfile:
+    path: /etc/falco/falco.yaml
+    regexp: '^\s*#\s*-\s*/etc/falco/rules\.d'
+    line: "  - /etc/falco/rules.d"
+  notify: restart falco
+
+- name: Remove unwanted rules in rules_files
+  ansible.builtin.lineinfile:
+    path: /etc/falco/falco.yaml
+    state: absent
+    regexp: "{{ item }}"
+  notify: restart falco
+  loop:
+    - '^\s*-\s*/etc/falco/falco_rules\.yaml'
+    - '^\s*-\s*/etc/falco/falco_rules\.local\.yaml'
+
+# Enable JSON output
+- name: Enable JSON output in falco.yaml
+  lineinfile:
+    path: /etc/falco/falco.yaml
+    regexp: "^json_output:"
+    line: "json_output: true"
+  notify: restart falco
+
+# Configure HTTP output to Falcosidekick
+- name: Enable HTTP output in falco.yaml
+  ansible.builtin.replace:
+    path: /etc/falco/falco.yaml
+    regexp: '(^http_output:(?:.*\n)*?\s+enabled:\s+)(true|false)'
+    replace: "\\1{{ falco_http_output_enabled | ternary('true','false')}}"
+  notify: restart falco
+
+- name: Set HTTP output URL in falco.yaml
+  ansible.builtin.replace:
+    path: /etc/falco/falco.yaml
+    regexp: '(^http_output:(?:.*\n)*?\s+url:\s+)"\s*"'
+    replace: "\\1\"{{ falco_http_output_url }}\""
+  notify: restart falco
+
+# Deploy custom Falco rules
+- name: Ensure /etc/falco/rules.d directory exists
+  file:
+    path: /etc/falco/rules.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy custom Falco rules
+  template:
+    src: falco-custom-rules.yaml.j2
+    dest: /etc/falco/rules.d/custom.yaml
+    owner: root
+    group: root
+    mode: "0644"
+  notify: restart falco
+
+# CentOS 7: Deploy custom falco.service with kmod engine
+- name: Deploy custom falco.service for CentOS 7 (kmod engine)
+  template:
+    src: falco.service.j2
+    dest: /etc/systemd/system/falco.service
+    owner: root
+    group: root
+    mode: "0644"
+  vars:
+    falco_driver: kmod
+  notify:
+    - reload systemd
+    - restart falco
+  when: ansible_distribution_major_version == "7"
+
+# Ensure falco service is enabled
+# The service file may come from the package or we may need to create it
+# Always reload daemon first to pick up any new/changed service files
+
+- name: Reload systemd daemon
+  systemd:
+    daemon_reload: yes
+
+- name: Check if falco service exists
+  shell: systemctl list-unit-files | grep -q '^falco\.service'
+  register: falco_service_check
+  changed_when: false
+  ignore_errors: true
+
+# If no service file exists, create a minimal one for Rocky Linux 9+
+- name: Deploy falco.service for Rocky Linux 9+ (ebpf)
+  template:
+    src: falco.service.j2
+    dest: /etc/systemd/system/falco.service
+    owner: root
+    group: root
+    mode: "0644"
+  when:
+    - falco_service_check.rc != 0
+    - ansible_distribution_major_version | int >= 9
+  notify:
+    - reload systemd
+    - restart falco
+
+- name: Reload systemd after potential service creation
+  systemd:
+    daemon_reload: yes
+  when: falco_service_check.rc != 0
+
+- name: Enable and start falco service
+  service:
+    name: falco
+    enabled: yes
+    state: started

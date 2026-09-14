@@ -1,0 +1,14 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart falco
+  service:
+    name: falco
+    state: restarted
+
+- name: restart falcosidekick
+  service:
+    name: falcosidekick
+    state: restarted

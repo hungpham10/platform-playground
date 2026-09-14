@@ -55,3 +55,5 @@ clickhouse_quotas:
       - duration: 3600
         queries: 5000
         errors: 50
+
+clickhouse_log_ttl_days: 7

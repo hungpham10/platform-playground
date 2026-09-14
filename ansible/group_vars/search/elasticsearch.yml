@@ -47,9 +47,4 @@ es_config:
     | list 
     | union(es_external_seed_hosts | default([]))
   }}" 
-  cluster.initial_master_nodes: "{{ 
-    groups['elasticsearch-master'] 
-    | map('extract', hostvars) 
-    | map(attribute='ansible_host') 
-    | list 
-  }}"
+  cluster.initial_master_nodes: "{{ hostvars[groups['elasticsearch-master'][0]].ansible_host }}"

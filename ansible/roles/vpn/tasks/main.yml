@@ -8,20 +8,14 @@
     update_cache: yes
 
 - name: Enable IP forwarding
-  sysctl:
+  ansible.builtin.command:
     name: net.ipv4.ip_forward
-    value: "1"
-    state: present
-    sysctl_set: yes
-    reload: yes
+    cmd: sysctl -w net.ipv4.ip_forward=1
 
 - name: Verify IP forwarding is enabled
-  sysctl:
+  ansible.builtin.command:
     name: net.ipv4.ip_forward
-    value: "1"
-    state: present
-    sysctl_set: yes
-    reload: yes
+    cmd: sysctl -w net.ipv4.ip_forward=1
   when: vpn_mode == 'server'
 
 - name: Install routing tools

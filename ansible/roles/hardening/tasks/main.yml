@@ -18,11 +18,9 @@
   notify: reload pam
 
 - name: Configure sysctl security parameters
-  sysctl:
+  ansible.builtin.command:
     name: "{{ item.key }}"
-    value: "{{ item.value }}"
-    state: present
-    reload: yes
+    cmd: sysctl -w "{{ item.key }}={{ item.value }}"
   loop: "{{ sysctl_security_params }}"
 
 - name: Configure SSH hardening

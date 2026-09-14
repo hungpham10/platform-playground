@@ -1,17 +1,4 @@
 ---
-- name: Verify required packages
-  assert:
-    that: 
-      - ansible_facts.packages[item] is defined
-    fail_msg: "Required package {{ item }} is not installed"
-    success_msg: "Required package {{ item }} is present"
-  loop: "{{ consul_required_packages }}"
-
-- name: Install Consul packages
-  package:
-    name: "{{ consul_required_packages }}"
-    state: present
-
 - name: Create Consul directories
   file:
     path: "{{ item }}"

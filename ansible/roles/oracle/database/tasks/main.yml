@@ -24,11 +24,9 @@
     - "{{ oracle_inventory }}"
 
 - name: Configure kernel parameters
-  sysctl:
+  ansible.builtin.command:
     name: "{{ item.name }}"
-    value: "{{ item.value }}"
-    state: present
-    sysctl_file: /etc/sysctl.d/99-oracle-database.conf
+    cmd: sysctl -w "{{ item.name }}={{ item.value }}"
   loop: "{{ oracle_kernel_params }}"
   notify: reload sysctl
 

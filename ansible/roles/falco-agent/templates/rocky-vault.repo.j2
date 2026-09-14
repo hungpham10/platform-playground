@@ -1,0 +1,13 @@
+[appstream-vault]
+name=Rocky Linux {{ vault_releasever }} - AppStream - Vault
+baseurl={{ falco_vault_base_url }}/{{ vault_releasever }}/AppStream/x86_64/os/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+enabled=1
+
+[baseos-vault]
+name=Rocky Linux {{ vault_releasever }} - BaseOS - Vault
+baseurl={{ falco_vault_base_url }}/{{ vault_releasever }}/BaseOS/x86_64/os/
+gpgcheck=1
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-rockyofficial
+enabled=1

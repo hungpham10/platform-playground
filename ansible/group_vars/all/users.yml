@@ -4,6 +4,8 @@ enable_users: true
 base_groups:
   - name: guest
     gid: 3002
+  - name: consul
+    gid: 3003
 
 user_password_salt: "{{ linux_user_password_salt | default(lookup('env', 'USER_PASSWORD_SALT')) }}"
 
@@ -11,4 +13,8 @@ base_users:
   - name: guest
     uid: 3002
     groups: ['guest']
+    ssh_keys: []
+  - name: consul
+    uid: 3003
+    groups: ['consul']
     ssh_keys: []

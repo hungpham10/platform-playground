@@ -1,11 +1,8 @@
 ---
 - name: Configure network forwarding
-  sysctl:
+  ansible.builtin.command:
     name: net.ipv4.ip_forward
-    value: '1'
-    sysctl_set: yes
-    state: present
-    reload: yes
+    cmd: sysctl -w net.ipv4.ip_forward=1
   when: enable_forwarding | bool and is_gateway_machine | bool
 
 - name: Load network configuration

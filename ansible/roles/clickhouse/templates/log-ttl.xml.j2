@@ -1,0 +1,18 @@
+
+{% if clickhouse_log_ttl_days is defined %}
+<clickhouse>
+    <text_log>
+        <engine>MergeTree()</engine>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <order_by>(event_date, event_time)</order_by>
+        <ttl>event_date + INTERVAL {{ clickhouse_log_ttl_days }} DAY DELETE</ttl>
+    </text_log>
+
+    <part_log>
+        <engine>MergeTree()</engine>
+        <partition_by>toYYYYMM(event_date)</partition_by>
+        <order_by>(event_date, event_time)</order_by>
+        <ttl>event_date + INTERVAL {{ clickhouse_log_ttl_days }} DAY DELETE</ttl>
+    </part_log>
+</clickhouse>
+{% endif %}

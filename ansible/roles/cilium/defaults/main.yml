@@ -1,0 +1,11 @@
+---
+cilium_version: "1.15.5" # Hoặc bản bạn đang dùng
+k8s_pod_cidr: "10.10.0.0/16"
+
+k8s_api_host: "{{ hostvars[groups['master']]['ansible_host'] }}"
+k8s_api_port: 6443
+kubeconfig_path: "/var/lib/k0s/pki/admin.conf"
+
+arch_mapping:
+  x86_64: amd64
+  aarch64: arm64

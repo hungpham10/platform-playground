@@ -1,0 +1,34 @@
+---
+# Falco version for CentOS 7 (pinned due to eBPF not supported)
+falco_version_centos7: "0.37.1"
+
+# Falco driver: kmod (CentOS 7), ebpf (Rocky Linux 9)
+# Only used when creating a custom service file
+falco_driver: "modern_ebpf"
+
+# Whether to include container and k8s fields in custom rules
+# Set to true for Kubernetes/container environments (e.g., Rocky Linux 9)
+falco_include_container_fields: false
+
+# Whether to run full yum update during installation
+falco_yum_update: false
+
+# Falcosidekick settings
+falcosidekick_listen_address: "0.0.0.0"
+falcosidekick_listen_port: 2801
+
+# Kafka output settings
+falcosidekick_kafka_hostport: "vmfc-kafka-sec-01.srv.tiki.services:9092,vmfc-kafka-sec-02.srv.tiki.services:9092,vmfc-kafka-sec-03.srv.tiki.services:9092"
+falcosidekick_kafka_topic: "soc_falco_log_v2"
+falcosidekick_kafka_sasl: "SCRAM_SHA512"
+falcosidekick_kafka_username: "soc"
+falcosidekick_kafka_password: ""
+
+# Vault repo base URL for older kernel-devel packages
+# Rocky Linux: https://download.rockylinux.org/vault/rocky
+# AlmaLinux:  https://repo.almalinux.org/vault/almalinux
+falco_vault_base_url: "https://download.rockylinux.org/vault/rocky"
+
+# Falco HTTP output to Falcosidekick
+falco_http_output_enabled: true
+falco_http_output_url: "http://127.0.0.1:2801/"

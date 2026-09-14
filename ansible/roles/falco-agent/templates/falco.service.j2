@@ -1,0 +1,29 @@
+[Unit]
+Description=Falco: Container Native Runtime Security
+Documentation=https://falco.org/docs/
+{% if falco_driver == 'kmod' %}
+Before=falcoctl-artifact-follow.service
+Wants=falcoctl-artifact-follow.service
+{% endif %}
+
+[Service]
+Type=simple
+User=root
+ExecStart=/usr/bin/falco{% if falco_driver is defined %} -o engine.kind={{ falco_driver }}{% endif %}
+
+ExecReload=kill -1 $MAINPID
+UMask=0077
+TimeoutSec=30
+RestartSec=15s
+Restart=on-failure
+PrivateTmp=true
+NoNewPrivileges=yes
+ProtectHome=read-only
+ProtectSystem=full
+ProtectKernelTunables=true
+RestrictRealtime=true
+RestrictAddressFamilies=~AF_PACKET
+
+[Install]
+WantedBy=multi-user.target
+Alias=falco.service
